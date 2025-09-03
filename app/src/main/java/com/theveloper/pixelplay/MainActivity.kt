@@ -308,14 +308,10 @@ class MainActivity : ComponentActivity() {
                 val screenHeightPx = remember(configuration) { with(density) { configuration.screenHeightDp.dp.toPx() } }
                 val navBarStyle by playerViewModel.navBarStyle.collectAsState()
                 val systemNavBarInset = innerPadding.calculateBottomPadding()//WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                val actualCollapsedStateBottomMargin = if (navBarStyle == NavBarStyle.FULL_WIDTH) {
-                    if (shouldHideNavigationBar) {
-                        systemNavBarInset
-                    } else {
-                        0.dp
-                    }
-                } else {
+                val actualCollapsedStateBottomMargin = if (shouldHideNavigationBar) {
                     systemNavBarInset
+                } else {
+                    0.dp
                 }
                 val navBarH = with(density) { (NavBarContentHeight + systemNavBarInset).toPx() }
                 val collapsedMarginPx = with(density) { actualCollapsedStateBottomMargin.toPx() }
@@ -344,7 +340,6 @@ class MainActivity : ComponentActivity() {
                     navController = navController,
                     navItems = commonNavItems,
                     initialTargetTranslationY = initialY,
-                    collapsedStateHorizontalPadding = actualCollapsedStateBottomMargin,
                     collapsedStateBottomMargin = actualCollapsedStateBottomMargin,
                     hideNavigationBar = shouldHideNavigationBar,
                     hideMiniPlayer = shouldHideMiniPlayer
