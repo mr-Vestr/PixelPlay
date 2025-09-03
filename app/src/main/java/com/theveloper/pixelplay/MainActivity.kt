@@ -340,6 +340,7 @@ class MainActivity : ComponentActivity() {
                     navController = navController,
                     navItems = commonNavItems,
                     initialTargetTranslationY = initialY,
+                    systemNavBarInset = systemNavBarInset,
                     collapsedStateBottomMargin = actualCollapsedStateBottomMargin,
                     hideNavigationBar = shouldHideNavigationBar,
                     hideMiniPlayer = shouldHideMiniPlayer

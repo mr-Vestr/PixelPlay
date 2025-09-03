@@ -142,6 +142,7 @@ fun UnifiedPlayerSheet(
     navController: NavHostController,
     navItems: ImmutableList<BottomNavItem>,
     initialTargetTranslationY: Float,
+    systemNavBarInset: Dp,
     collapsedStateHorizontalPadding: Dp = 12.dp,
     collapsedStateBottomMargin: Dp = 0.dp,
     hideNavigationBar: Boolean = false,
@@ -212,7 +213,6 @@ fun UnifiedPlayerSheet(
 
     val screenHeightPx = remember(configuration) { with(density) { configuration.screenHeightDp.dp.toPx() } }
     val miniPlayerContentHeightPx = remember { with(density) { MiniPlayerHeight.toPx() } }
-    val systemNavBarInset = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
     val navBarHeightPx = remember(density, systemNavBarInset, navBarStyle) {
         val height = if (navBarStyle == NavBarStyle.FULL_WIDTH) NavBarContentHeightFullWidth else NavBarContentHeight
         with(density) { (height + systemNavBarInset).toPx() }
