@@ -73,8 +73,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -129,8 +129,11 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.roundToLong
+import kotlin.math.sign
 
 private val LocalMaterialTheme = staticCompositionLocalOf<ColorScheme> { error("No ColorScheme provided") }
+
+private enum class DragPhase { IDLE, TENSION, SNAPPING, FREE_DRAG }
 
 val MiniPlayerHeight = 64.dp
 val PlayerSheetExpandedCornerRadius = 32.dp
@@ -200,15 +203,15 @@ fun UnifiedPlayerSheet(
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
 
-    var horizontalDragOffset by remember { mutableFloatStateOf(0f) }
+    val offsetAnimatable = remember { Animatable(0f) }
 
     val screenWidthPx = remember(configuration, density) { with(density) { configuration.screenWidthDp.dp.toPx() } }
     val dismissThresholdPx = remember(screenWidthPx) { screenWidthPx * 0.4f }
 
-    val swipeDismissProgress = remember(horizontalDragOffset, dismissThresholdPx) {
+    val swipeDismissProgress = remember(offsetAnimatable.value, dismissThresholdPx) {
         derivedStateOf {
             if (dismissThresholdPx == 0f) 0f
-            else (abs(horizontalDragOffset) / dismissThresholdPx).coerceIn(0f, 1f)
+            else (abs(offsetAnimatable.value) / dismissThresholdPx).coerceIn(0f, 1f)
         }
     }
 
@@ -771,44 +774,82 @@ fun UnifiedPlayerSheet(
                             .fillMaxWidth()
                             .pointerInput(playerViewModel, showPlayerContentArea, currentSheetContentState, configuration, density, scope) {
                                 if (!showPlayerContentArea || currentSheetContentState != PlayerSheetState.COLLAPSED) {
-                                    if (horizontalDragOffset != 0f) horizontalDragOffset = 0f
+                                    scope.launch { offsetAnimatable.snapTo(0f) }
                                     return@pointerInput
                                 }
-                                var accumulatedDragX = 0f
+                                var accumulatedDragX by mutableFloatStateOf(0f)
+                                var dragPhase by mutableStateOf(DragPhase.IDLE)
+
                                 detectHorizontalDragGestures(
                                     onDragStart = {
+                                        dragPhase = DragPhase.TENSION
                                         accumulatedDragX = 0f
+                                        scope.launch { offsetAnimatable.stop() }
                                     },
                                     onHorizontalDrag = { change, dragAmount ->
-                                        change.consume()
+                                        // Always update the accumulated drag to track the finger's position.
                                         accumulatedDragX += dragAmount
-                                        horizontalDragOffset += dragAmount
+                                        change.consume()
+
+                                        // Only manipulate the offset if we are not in the middle of the snap animation.
+                                        // This prevents the animation from being interrupted while still tracking the drag.
+                                        if (dragPhase != DragPhase.SNAPPING) {
+                                            when (dragPhase) {
+                                                DragPhase.TENSION -> {
+                                                    val snapThresholdPx = with(density) { 100.dp.toPx() }
+                                                    if (abs(accumulatedDragX) < snapThresholdPx) {
+                                                        val maxTensionOffsetPx = with(density) { 30.dp.toPx() }
+                                                        val dragFraction = (abs(accumulatedDragX) / snapThresholdPx).coerceIn(0f, 1f)
+                                                        val tensionOffset = lerp(0f, maxTensionOffsetPx, dragFraction)
+                                                        scope.launch { offsetAnimatable.snapTo(tensionOffset * accumulatedDragX.sign) }
+                                                    } else {
+                                                        // Fire haptics at the moment of the snap
+                                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        dragPhase = DragPhase.SNAPPING
+                                                        scope.launch {
+                                                            offsetAnimatable.animateTo(
+                                                                targetValue = accumulatedDragX,
+                                                                animationSpec = spring(
+                                                                    dampingRatio = 0.8f,
+                                                                    stiffness = Spring.StiffnessLow
+                                                                )
+                                                            )
+                                                            // Once the snap animation is complete, transition to free drag
+                                                            dragPhase = DragPhase.FREE_DRAG
+                                                        }
+                                                    }
+                                                }
+                                                DragPhase.FREE_DRAG -> {
+                                                    // In free drag, the offset just follows the finger
+                                                    scope.launch { offsetAnimatable.snapTo(accumulatedDragX) }
+                                                }
+                                                else -> {} // IDLE is handled by onDragStart/End
+                                            }
+                                        }
                                     },
                                     onDragEnd = {
-                                        val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+                                        dragPhase = DragPhase.IDLE
                                         val dismissThreshold = screenWidthPx * 0.4f
-                                        val currentVisualOffset = horizontalDragOffset
-                                        if (abs(accumulatedDragX) > dismissThreshold) {
-                                            val targetDismissOffset = if (accumulatedDragX < 0) -screenWidthPx else screenWidthPx
+                                        // Use the animatable's value for the check, as it's the source of truth for the visual offset
+                                        if (abs(offsetAnimatable.value) > dismissThreshold) {
+                                            val targetDismissOffset = if (offsetAnimatable.value < 0) -screenWidthPx else screenWidthPx
                                             scope.launch {
-                                                Animatable(currentVisualOffset).animateTo(
+                                                offsetAnimatable.animateTo(
                                                     targetValue = targetDismissOffset,
                                                     animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
-                                                ) { horizontalDragOffset = value }
+                                                )
                                                 playerViewModel.dismissPlaylistAndShowUndo()
-                                                horizontalDragOffset = 0f
-                                                accumulatedDragX = 0f
+                                                offsetAnimatable.snapTo(0f)
                                             }
                                         } else {
                                             scope.launch {
-                                                Animatable(currentVisualOffset).animateTo(
+                                                offsetAnimatable.animateTo(
                                                     targetValue = 0f,
                                                     animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
                                                         stiffness = Spring.StiffnessMedium
                                                     )
-                                                ) { horizontalDragOffset = value }
-                                                accumulatedDragX = 0f
+                                                )
                                             }
                                         }
                                     }
@@ -817,7 +858,7 @@ fun UnifiedPlayerSheet(
                             .padding(horizontal = currentHorizontalPadding)
                             .height(playerContentAreaActualHeightDp)
                             .graphicsLayer {
-                                translationX = horizontalDragOffset
+                                translationX = offsetAnimatable.value
                                 scaleY = visualOvershootScaleY.value
                                 transformOrigin = TransformOrigin(0.5f, 1f)
                             }
@@ -912,7 +953,6 @@ fun UnifiedPlayerSheet(
                                                             easing = FastOutSlowInEasing
                                                         )
                                                     )
-                                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 }
                                                 launch {
                                                     playerContentExpansionFraction.animateTo(
@@ -922,6 +962,7 @@ fun UnifiedPlayerSheet(
                                                             easing = FastOutSlowInEasing
                                                         )
                                                     )
+                                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 }
                                                 playerViewModel.expandPlayerSheet()
                                             } else {
@@ -951,7 +992,6 @@ fun UnifiedPlayerSheet(
                                                             stiffness = Spring.StiffnessLow
                                                         )
                                                     )
-                                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 }
                                                 launch {
                                                     playerContentExpansionFraction.animateTo(
@@ -962,6 +1002,7 @@ fun UnifiedPlayerSheet(
                                                             stiffness = Spring.StiffnessLow
                                                         )
                                                     )
+                                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 }
                                                 playerViewModel.collapsePlayerSheet()
                                             }
