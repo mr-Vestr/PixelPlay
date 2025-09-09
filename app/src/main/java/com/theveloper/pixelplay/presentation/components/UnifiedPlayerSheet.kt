@@ -74,9 +74,11 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -199,6 +201,7 @@ fun UnifiedPlayerSheet(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
 
     val offsetAnimatable = remember { Animatable(0f) }
 
@@ -791,6 +794,7 @@ fun UnifiedPlayerSheet(
                                                     val tensionOffset = lerp(0f, maxTensionOffsetPx, dragFraction)
                                                     scope.launch { offsetAnimatable.snapTo(tensionOffset * accumulatedDragX.sign) }
                                                 } else {
+                                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     // Threshold crossed, transition to the snap phase
                                                     dragPhase = DragPhase.SNAPPING
                                                 }
