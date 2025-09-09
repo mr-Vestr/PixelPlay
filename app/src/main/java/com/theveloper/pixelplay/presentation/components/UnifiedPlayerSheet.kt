@@ -121,6 +121,7 @@ import com.theveloper.pixelplay.presentation.viewmodel.LyricsSearchUiState
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
@@ -202,6 +203,17 @@ fun UnifiedPlayerSheet(
     val configuration = LocalConfiguration.current
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
+
+    // Haptic feedback for sheet expand/collapse state changes
+    LaunchedEffect(currentSheetContentState, haptics) {
+        snapshotFlow { currentSheetContentState }
+            .distinctUntilChanged()
+            .drop(1) // Skip the initial state on composition
+            .collect {
+                // Fire haptic feedback on state change (expand/collapse)
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+    }
 
     val offsetAnimatable = remember { Animatable(0f) }
 
