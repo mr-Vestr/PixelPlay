@@ -587,7 +587,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
                 iconColor = onPrimaryContainerColor,
                 isPlaying = isPlaying,
                 iconSize = 36.dp,
-                cornerRadius = 30.dp
+                cornerRadius = bgCornerRadius
             )
         }
     }
