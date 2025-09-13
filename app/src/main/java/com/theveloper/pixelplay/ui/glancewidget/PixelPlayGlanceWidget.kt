@@ -333,36 +333,53 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
             modifier = modifier.background(backgroundColor).cornerRadius(bgCornerRadius)
                 .padding(12.dp)
         ) {
-            Row(
-                modifier = GlanceModifier.fillMaxSize().cornerRadius(bgCornerRadius),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalAlignment = Alignment.CenterHorizontally
+            Column(
+                modifier = GlanceModifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                AlbumArtImageGlance(
-                    modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
-                    bitmapData = albumArtBitmapData,
-                    context = context,
-                    cornerRadius = 10.dp
+                Text(
+                    text = title,
+                    style = TextStyle(
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = textColor
+                    ),
+                    maxLines = 1,
+                    modifier = GlanceModifier.padding(bottom = 8.dp)
                 )
 
-                Spacer(GlanceModifier.width(8.dp))
+                Row(
+                    modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    AlbumArtImageGlance(
+                        modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
+                        bitmapData = albumArtBitmapData,
+                        context = context,
+                        cornerRadius = bgCornerRadius
+                    )
 
-                PlayPauseButtonGlance(
-                    modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
-                    backgroundColor = primaryContainerColor,
-                    iconColor = onPrimaryContainerColor,
-                    isPlaying = isPlaying,
-                    iconSize = 26.dp,
-                    cornerRadius = 10.dp
-                )
-                Spacer(GlanceModifier.width(8.dp))
-                NextButtonGlance(
-                    modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
-                    iconColor = onSecondaryColor,
-                    iconSize = 26.dp,
-                    backgroundColor = secondaryColor,
-                    cornerRadius = 10.dp
-                )
+                    Spacer(GlanceModifier.width(8.dp))
+
+                    PlayPauseButtonGlance(
+                        modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
+                        backgroundColor = primaryContainerColor,
+                        iconColor = onPrimaryContainerColor,
+                        isPlaying = isPlaying,
+                        iconSize = 26.dp,
+                        cornerRadius = bgCornerRadius
+                    )
+                    Spacer(GlanceModifier.width(8.dp))
+                    NextButtonGlance(
+                        modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
+                        iconColor = onSecondaryColor,
+                        iconSize = 26.dp,
+                        backgroundColor = secondaryColor,
+                        cornerRadius = bgCornerRadius
+                    )
+                }
             }
         }
     }
