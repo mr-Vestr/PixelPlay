@@ -218,7 +218,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
                     bgCornerRadius = 28.dp
                 )
 
-                FOUR_BY_TWO_SIZE -> ThinWidgetLayout(
+                FOUR_BY_TWO_SIZE -> ThinWidgetLayoutPadded(
                     modifier = baseModifier,
                     backgroundColor = actualBackgroundColor,
                     bgCornerRadius = 60.dp,
@@ -339,14 +339,79 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
+                    text = title, style = TextStyle(
+                        fontSize = 16.sp, fontWeight = FontWeight.Bold, color = textColor
+                    ), maxLines = 1, modifier = GlanceModifier.padding(bottom = 8.dp)
+                )
+
+                Row(
+                    modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    AlbumArtImageGlance(
+                        modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
+                        bitmapData = albumArtBitmapData,
+                        context = context,
+                        cornerRadius = bgCornerRadius
+                    )
+
+                    Spacer(GlanceModifier.width(8.dp))
+
+                    PlayPauseButtonGlance(
+                        modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
+                        backgroundColor = primaryContainerColor,
+                        iconColor = onPrimaryContainerColor,
+                        isPlaying = isPlaying,
+                        iconSize = 26.dp,
+                        cornerRadius = bgCornerRadius
+                    )
+                    Spacer(GlanceModifier.width(8.dp))
+                    NextButtonGlance(
+                        modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
+                        iconColor = onSecondaryColor,
+                        iconSize = 26.dp,
+                        backgroundColor = secondaryColor,
+                        cornerRadius = bgCornerRadius
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun ThinWidgetLayoutPadded(
+        modifier: GlanceModifier,
+        backgroundColor: ColorProvider,
+        bgCornerRadius: Dp,
+        title: String,
+        artist: String,
+        albumArtBitmapData: ByteArray?,
+        isPlaying: Boolean,
+        textColor: ColorProvider,
+        context: Context
+    ) {
+        val secondaryColor = GlanceTheme.colors.secondaryContainer
+        val onSecondaryColor = GlanceTheme.colors.onSecondaryContainer
+        val primaryContainerColor = GlanceTheme.colors.primaryContainer
+        val onPrimaryContainerColor = GlanceTheme.colors.onPrimaryContainer
+
+        Box(
+            modifier = modifier.background(backgroundColor).cornerRadius(bgCornerRadius)
+                .padding(top = 12.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
+        ) {
+            Column(
+                modifier = GlanceModifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
                     text = title,
                     style = TextStyle(
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = textColor
+                        fontSize = 16.sp, fontWeight = FontWeight.Bold, color = textColor
                     ),
                     maxLines = 1,
-                    modifier = GlanceModifier.padding(bottom = 8.dp)
+                    modifier = GlanceModifier.padding(start = 12.dp, end = 10.dp, bottom = 8.dp)
                 )
 
                 Row(
