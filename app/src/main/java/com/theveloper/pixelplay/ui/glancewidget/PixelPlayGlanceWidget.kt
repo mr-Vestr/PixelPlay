@@ -197,7 +197,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
                 THREE_BY_TWO_SIZE -> ThinWidgetLayout(
                     modifier = baseModifier,
                     backgroundColor = actualBackgroundColor,
-                    bgCornerRadius = 60.dp,
+                    bgCornerRadius = 28.dp,
                     title = title,
                     artist = artist,
                     albumArtBitmapData = albumArtBitmapData,
@@ -275,7 +275,6 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
         val onSecondaryColor = GlanceTheme.colors.onSecondaryContainer
         val primaryContainerColor = GlanceTheme.colors.primaryContainer
         val onPrimaryContainerColor = GlanceTheme.colors.onPrimaryContainer
-        LocalSize.current
 
         Box(
             modifier = modifier.background(backgroundColor).cornerRadius(bgCornerRadius)
@@ -329,26 +328,24 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
         val onSecondaryColor = GlanceTheme.colors.onSecondaryContainer
         val primaryContainerColor = GlanceTheme.colors.primaryContainer
         val onPrimaryContainerColor = GlanceTheme.colors.onPrimaryContainer
-        LocalSize.current
 
         Box(
             modifier = modifier.background(backgroundColor).cornerRadius(bgCornerRadius)
-                .padding(12.dp) // Padding applied to the outer box
+                .padding(12.dp)
         ) {
             Row(
                 modifier = GlanceModifier.fillMaxSize().cornerRadius(bgCornerRadius),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalAlignment = Alignment.Horizontal.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-
                 AlbumArtImageGlance(
                     modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
                     bitmapData = albumArtBitmapData,
                     context = context,
-                    cornerRadius = bgCornerRadius
+                    cornerRadius = 10.dp
                 )
 
-                Spacer(GlanceModifier.width(8.dp)) // Changed from height(8.dp) to width(8.dp)
+                Spacer(GlanceModifier.width(8.dp))
 
                 PlayPauseButtonGlance(
                     modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
@@ -358,7 +355,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
                     iconSize = 26.dp,
                     cornerRadius = 10.dp
                 )
-                Spacer(GlanceModifier.width(10.dp))
+                Spacer(GlanceModifier.width(8.dp))
                 NextButtonGlance(
                     modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
                     iconColor = onSecondaryColor,
@@ -366,7 +363,6 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
                     backgroundColor = secondaryColor,
                     cornerRadius = 10.dp
                 )
-
             }
         }
     }
