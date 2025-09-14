@@ -83,7 +83,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
         // Heights are based on the smaller landscape mode cell size.
 
         private val ONE_BY_ONE_SIZE = DpSize(57.dp, 51.dp)
-        private val ONE_BY_TWO_SIZE = DpSize(57.dp, 117.dp)
+        private val ONE_BY_TWO_SIZE = DpSize(57.dp, 154.dp)
         private val TWO_BY_ONE_SIZE = DpSize(130.dp, 51.dp)
         private val TWO_BY_TWO_SIZE = DpSize(130.dp, 117.dp)
         private val THREE_BY_ONE_SIZE = DpSize(203.dp, 51.dp)
@@ -92,7 +92,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
         private val FOUR_BY_TWO_SIZE = DpSize(276.dp, 117.dp)
         private val FOUR_BY_THREE_SIZE = DpSize(276.dp, 184.dp)
         private val FOUR_BY_FOUR_SIZE = DpSize(276.dp, 250.dp)
-        private val FIVE_BY_THREE_SIZE = DpSize(349.dp, 184.dp)
+        private val FIVE_BY_THREE_SIZE = DpSize(349.dp, 200.dp)
         private val FIVE_BY_FOUR_SIZE = DpSize(349.dp, 250.dp)
         private val FIVE_BY_FIVE_SIZE = DpSize(349.dp, 316.dp)
     }
@@ -584,7 +584,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
 
         Box(
             modifier = modifier.background(backgroundColor).cornerRadius(bgCornerRadius)
-                .padding(8.dp), contentAlignment = Alignment.Center
+                .padding(10.dp), contentAlignment = Alignment.Center
         ) {
             PlayPauseButtonGlance(
                 modifier = GlanceModifier.fillMaxSize(),
