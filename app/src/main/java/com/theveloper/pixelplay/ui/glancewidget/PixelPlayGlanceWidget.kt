@@ -77,19 +77,24 @@ private object AlbumArtBitmapCache {
 class PixelPlayGlanceWidget : GlanceAppWidget() {
 
     companion object {
-        private val ONE_BY_ONE_SIZE = DpSize(60.dp, 60.dp)
-        private val ONE_BY_TWO_SIZE = DpSize(60.dp, 120.dp)
-        private val TWO_BY_ONE_SIZE = DpSize(120.dp, 60.dp)
-        private val TWO_BY_TWO_SIZE = DpSize(120.dp, 120.dp)
-        private val THREE_BY_ONE_SIZE = DpSize(180.dp, 60.dp)
-        private val THREE_BY_TWO_SIZE = DpSize(180.dp, 120.dp)
-        private val THREE_BY_THREE_SIZE = DpSize(180.dp, 180.dp)
-        private val FOUR_BY_TWO_SIZE = DpSize(240.dp, 120.dp)
-        private val FOUR_BY_THREE_SIZE = DpSize(240.dp, 180.dp)
-        private val FOUR_BY_FOUR_SIZE = DpSize(240.dp, 240.dp)
-        private val FIVE_BY_THREE_SIZE = DpSize(300.dp, 180.dp)
-        private val FIVE_BY_FOUR_SIZE = DpSize(300.dp, 240.dp)
-        private val FIVE_BY_FIVE_SIZE = DpSize(300.dp, 300.dp)
+        // Calculated using the formula from the Android developer documentation
+        // to provide more accurate breakpoints for responsive layouts.
+        // Widths are based on the smaller portrait mode cell size.
+        // Heights are based on the smaller landscape mode cell size.
+
+        private val ONE_BY_ONE_SIZE = DpSize(57.dp, 51.dp)
+        private val ONE_BY_TWO_SIZE = DpSize(57.dp, 117.dp)
+        private val TWO_BY_ONE_SIZE = DpSize(130.dp, 51.dp)
+        private val TWO_BY_TWO_SIZE = DpSize(130.dp, 117.dp)
+        private val THREE_BY_ONE_SIZE = DpSize(203.dp, 51.dp)
+        private val THREE_BY_TWO_SIZE = DpSize(203.dp, 117.dp)
+        private val THREE_BY_THREE_SIZE = DpSize(203.dp, 184.dp)
+        private val FOUR_BY_TWO_SIZE = DpSize(276.dp, 117.dp)
+        private val FOUR_BY_THREE_SIZE = DpSize(276.dp, 184.dp)
+        private val FOUR_BY_FOUR_SIZE = DpSize(276.dp, 250.dp)
+        private val FIVE_BY_THREE_SIZE = DpSize(349.dp, 184.dp)
+        private val FIVE_BY_FOUR_SIZE = DpSize(349.dp, 250.dp)
+        private val FIVE_BY_FIVE_SIZE = DpSize(349.dp, 316.dp)
     }
 
     override val sizeMode = SizeMode.Responsive(
