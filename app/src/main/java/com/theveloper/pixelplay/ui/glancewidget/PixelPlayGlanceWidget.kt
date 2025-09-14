@@ -248,7 +248,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
                     context = context
                 )
 
-                size.width >= ONE_BY_TWO_SIZE.width && size.height >= ONE_BY_TWO_SIZE.height -> GabeWidgetLayout(
+                size.width >= ONE_BY_TWO_SIZE.width && size.width < 59.dp && size.height >= ONE_BY_TWO_SIZE.height -> GabeWidgetLayout(
                     modifier = baseModifier,
                     backgroundColor = actualBackgroundColor,
                     bgCornerRadius = 360.dp,
@@ -528,21 +528,25 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
         val onPrimaryContainerColor = GlanceTheme.colors.onPrimaryContainer
 
         Box(
-            modifier = modifier.background(backgroundColor).cornerRadius(bgCornerRadius)
-                .padding(10.dp)
+            modifier = modifier // Apply the base modifier for click handling and sizing
+                .background(backgroundColor).cornerRadius(bgCornerRadius),
+            contentAlignment = Alignment.Center
         ) {
             Column(
-                modifier = GlanceModifier.fillMaxSize(),
+                modifier = GlanceModifier.padding(10.dp).fillMaxSize()
+                    .cornerRadius(bgCornerRadius), // Padding applied to the content area
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalAlignment = Alignment.Vertical.CenterVertically
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                AlbumArtImageGlance(
-                    modifier = GlanceModifier.defaultWeight().fillMaxWidth().height(44.dp),
-                    bitmapData = albumArtBitmapData,
-                    context = context,
-                    cornerRadius = 64.dp
-                )
-                Spacer(GlanceModifier.height(8.dp))
+                Column(modifier = GlanceModifier.fillMaxSize().cornerRadius(bgCornerRadius)) {
+                    AlbumArtImageGlance(
+                        modifier = GlanceModifier.height(44.dp)
+                            .fillMaxWidth(), // Fills the width of the padded Column
+                        bitmapData = albumArtBitmapData, context = context, cornerRadius = 64.dp
+                    )
+                    Spacer(GlanceModifier.height(8.dp))
+
+
                 Column(
                     modifier = GlanceModifier.defaultWeight().cornerRadius(bgCornerRadius)
                 ) {
@@ -571,6 +575,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
                         cornerRadius = 10.dp
                     )
                 }
+            }
             }
         }
     }
@@ -621,8 +626,9 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalAlignment = Alignment.Horizontal.CenterHorizontally
             ) {
+                Spacer(GlanceModifier.width(4.dp))
                 AlbumArtImageGlance(
-                    modifier = GlanceModifier.defaultWeight().padding(vertical = 6.dp),
+                    modifier = GlanceModifier.defaultWeight().padding(vertical = 10.dp),
                     bitmapData = albumArtBitmapData,
                     context = context,
                     cornerRadius = 64.dp
@@ -657,8 +663,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
         val playButtonCornerRadius = if (isPlaying) 12.dp else 60.dp
 
         Box(
-            modifier = modifier.background(backgroundColor).cornerRadius(bgCornerRadius)
-                .padding(12.dp)
+            modifier = modifier.background(backgroundColor).padding(12.dp)
         ) {
             Column(
                 modifier = GlanceModifier.fillMaxSize(),
