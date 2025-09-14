@@ -83,7 +83,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
         // Heights are based on the smaller landscape mode cell size.
 
         private val ONE_BY_ONE_SIZE = DpSize(57.dp, 51.dp)
-        private val ONE_BY_TWO_SIZE = DpSize(57.dp, 154.dp)
+        private val ONE_BY_TWO_SIZE = DpSize(57.dp, 117.dp)
         private val TWO_BY_ONE_SIZE = DpSize(130.dp, 51.dp)
         private val TWO_BY_TWO_SIZE = DpSize(130.dp, 117.dp)
         private val THREE_BY_ONE_SIZE = DpSize(203.dp, 51.dp)
@@ -92,7 +92,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
         private val FOUR_BY_TWO_SIZE = DpSize(276.dp, 117.dp)
         private val FOUR_BY_THREE_SIZE = DpSize(276.dp, 184.dp)
         private val FOUR_BY_FOUR_SIZE = DpSize(276.dp, 250.dp)
-        private val FIVE_BY_THREE_SIZE = DpSize(349.dp, 200.dp)
+        private val FIVE_BY_THREE_SIZE = DpSize(349.dp, 184.dp)
         private val FIVE_BY_FOUR_SIZE = DpSize(349.dp, 250.dp)
         private val FIVE_BY_FIVE_SIZE = DpSize(349.dp, 316.dp)
     }
@@ -120,6 +120,8 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
         provideContent {
             val playerInfo = currentState<PlayerInfo>()
             val currentSize = LocalSize.current
+
+            println("Current Size: $currentSize")
 
             Timber.tag("PixelPlayGlanceWidget")
                 .d("Providing Glance. PlayerInfo: title='${playerInfo.songTitle}', artist='${playerInfo.artistName}', isPlaying=${playerInfo.isPlaying}, hasBitmap=${playerInfo.albumArtBitmapData != null}, progress=${playerInfo.currentPositionMs}/${playerInfo.totalDurationMs}")
@@ -149,93 +151,25 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
         val baseModifier =
             GlanceModifier.fillMaxSize().clickable(actionStartActivity<MainActivity>())
 
+        println(size)
         Box(
             GlanceModifier.fillMaxSize()
         ) {
-            when (size) {
-                ONE_BY_ONE_SIZE -> OneByOneWidgetLayout(
+            when {
+                size.width >= FIVE_BY_THREE_SIZE.width && size.height >= FIVE_BY_THREE_SIZE.height -> ExtraLargeWidgetLayout(
                     modifier = baseModifier,
-                    backgroundColor = actualBackgroundColor,
-                    bgCornerRadius = 100.dp,
-                    isPlaying = isPlaying
-                )
-
-                ONE_BY_TWO_SIZE -> GabeWidgetLayout(
-                    modifier = baseModifier,
-                    backgroundColor = actualBackgroundColor,
-                    bgCornerRadius = 360.dp,
+                    title = title,
+                    artist = artist,
                     albumArtBitmapData = albumArtBitmapData,
                     isPlaying = isPlaying,
-                    context = context
-                )
-
-                TWO_BY_ONE_SIZE -> SmallHorizontalWidgetLayout(
-                    modifier = baseModifier,
-                    backgroundColor = actualBackgroundColor,
-                    bgCornerRadius = 60.dp,
-                    albumArtBitmapData = albumArtBitmapData,
-                    isPlaying = isPlaying,
-                    context = context
-                )
-
-                TWO_BY_TWO_SIZE -> SmallWidgetLayout(
-                    modifier = baseModifier,
                     backgroundColor = actualBackgroundColor,
                     bgCornerRadius = 28.dp,
-                    albumArtBitmapData = albumArtBitmapData,
-                    isPlaying = isPlaying,
-                    context = context
-                )
-
-                THREE_BY_ONE_SIZE -> VeryThinWidgetLayout(
-                    modifier = baseModifier,
-                    backgroundColor = actualBackgroundColor,
-                    bgCornerRadius = 60.dp,
-                    title = title,
-                    artist = artist,
-                    albumArtBitmapData = albumArtBitmapData,
-                    isPlaying = isPlaying,
-                    textColor = onBackgroundColor,
-                    context = context
-                )
-
-                THREE_BY_TWO_SIZE -> ThinWidgetLayout(
-                    modifier = baseModifier,
-                    backgroundColor = actualBackgroundColor,
-                    bgCornerRadius = 28.dp,
-                    title = title,
-                    artist = artist,
-                    albumArtBitmapData = albumArtBitmapData,
-                    isPlaying = isPlaying,
-                    textColor = onBackgroundColor,
-                    context = context
-                )
-
-                THREE_BY_THREE_SIZE -> MediumWidgetLayout(
-                    modifier = baseModifier,
-                    title = title,
-                    artist = artist,
-                    albumArtBitmapData = albumArtBitmapData,
-                    isPlaying = isPlaying,
                     textColor = onBackgroundColor,
                     context = context,
-                    backgroundColor = actualBackgroundColor,
-                    bgCornerRadius = 28.dp
+                    queue = playerInfo.queue
                 )
 
-                FOUR_BY_TWO_SIZE -> ThinWidgetLayoutPadded(
-                    modifier = baseModifier,
-                    backgroundColor = actualBackgroundColor,
-                    bgCornerRadius = 60.dp,
-                    title = title,
-                    artist = artist,
-                    albumArtBitmapData = albumArtBitmapData,
-                    isPlaying = isPlaying,
-                    textColor = onBackgroundColor,
-                    context = context
-                )
-
-                FOUR_BY_THREE_SIZE -> LargeWidgetLayout(
+                size.width >= FOUR_BY_THREE_SIZE.width && size.height >= FOUR_BY_THREE_SIZE.height -> LargeWidgetLayout(
                     modifier = baseModifier,
                     title = title,
                     artist = artist,
@@ -248,17 +182,86 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
                     context = context
                 )
 
-                else -> ExtraLargeWidgetLayout(
+                size.width >= FOUR_BY_TWO_SIZE.width && size.height >= FOUR_BY_TWO_SIZE.height -> ThinWidgetLayoutPadded(
+                    modifier = baseModifier,
+                    backgroundColor = actualBackgroundColor,
+                    bgCornerRadius = 60.dp,
+                    title = title,
+                    artist = artist,
+                    albumArtBitmapData = albumArtBitmapData,
+                    isPlaying = isPlaying,
+                    textColor = onBackgroundColor,
+                    context = context
+                )
+
+                size.width >= THREE_BY_THREE_SIZE.width && size.height >= THREE_BY_THREE_SIZE.height -> MediumWidgetLayout(
                     modifier = baseModifier,
                     title = title,
                     artist = artist,
                     albumArtBitmapData = albumArtBitmapData,
                     isPlaying = isPlaying,
-                    backgroundColor = actualBackgroundColor,
-                    bgCornerRadius = 28.dp,
                     textColor = onBackgroundColor,
                     context = context,
-                    queue = playerInfo.queue
+                    backgroundColor = actualBackgroundColor,
+                    bgCornerRadius = 28.dp
+                )
+
+                size.width >= THREE_BY_TWO_SIZE.width && size.height >= THREE_BY_TWO_SIZE.height -> ThinWidgetLayout(
+                    modifier = baseModifier,
+                    backgroundColor = actualBackgroundColor,
+                    bgCornerRadius = 28.dp,
+                    title = title,
+                    artist = artist,
+                    albumArtBitmapData = albumArtBitmapData,
+                    isPlaying = isPlaying,
+                    textColor = onBackgroundColor,
+                    context = context
+                )
+
+                size.width >= THREE_BY_ONE_SIZE.width && size.height >= THREE_BY_ONE_SIZE.height -> VeryThinWidgetLayout(
+                    modifier = baseModifier,
+                    backgroundColor = actualBackgroundColor,
+                    bgCornerRadius = 60.dp,
+                    title = title,
+                    artist = artist,
+                    albumArtBitmapData = albumArtBitmapData,
+                    isPlaying = isPlaying,
+                    textColor = onBackgroundColor,
+                    context = context
+                )
+
+                size.width >= TWO_BY_TWO_SIZE.width && size.height >= TWO_BY_TWO_SIZE.height -> SmallWidgetLayout(
+                    modifier = baseModifier,
+                    backgroundColor = actualBackgroundColor,
+                    bgCornerRadius = 28.dp,
+                    albumArtBitmapData = albumArtBitmapData,
+                    isPlaying = isPlaying,
+                    context = context
+                )
+
+                size.width >= TWO_BY_ONE_SIZE.width && size.height >= TWO_BY_ONE_SIZE.height -> SmallHorizontalWidgetLayout(
+                    modifier = baseModifier,
+                    backgroundColor = actualBackgroundColor,
+                    bgCornerRadius = 60.dp,
+                    albumArtBitmapData = albumArtBitmapData,
+                    isPlaying = isPlaying,
+                    context = context
+                )
+
+                size.width >= ONE_BY_TWO_SIZE.width && size.height >= ONE_BY_TWO_SIZE.height -> GabeWidgetLayout(
+                    modifier = baseModifier,
+                    backgroundColor = actualBackgroundColor,
+                    bgCornerRadius = 360.dp,
+                    albumArtBitmapData = albumArtBitmapData,
+                    isPlaying = isPlaying,
+                    context = context
+                )
+
+                else -> OneByOneWidgetLayout(
+                    modifier = baseModifier,
+                    backgroundColor = actualBackgroundColor,
+                    bgCornerRadius = 100.dp,
+                    isPlaying = isPlaying
                 )
             }
         }
