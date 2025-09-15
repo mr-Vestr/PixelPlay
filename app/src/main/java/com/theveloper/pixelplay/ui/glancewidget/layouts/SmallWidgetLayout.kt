@@ -42,7 +42,10 @@ fun SmallWidgetLayout(
     val playButtonCornerRadius = if (isPlaying) 12.dp else 60.dp
 
     Box(
-        modifier = modifier.background(backgroundColor).padding(12.dp)
+        modifier = modifier
+            .background(backgroundColor)
+            .padding(12.dp)
+            .cornerRadius(bgCornerRadius)
     ) {
         Column(
             modifier = GlanceModifier.fillMaxSize(),
