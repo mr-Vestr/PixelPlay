@@ -80,7 +80,7 @@ fun PixelPlayWidget_Preview_2x1() {
 }
 
 @OptIn(ExperimentalGlancePreviewApi::class)
-@Preview(widthDp = 130, heightDp = 117)
+@Preview(widthDp = 130, heightDp = 136)
 @Composable
 fun PixelPlayWidget_Preview_2x2() {
     PixelPlayGlanceWidgetPreviewProvider().Content()

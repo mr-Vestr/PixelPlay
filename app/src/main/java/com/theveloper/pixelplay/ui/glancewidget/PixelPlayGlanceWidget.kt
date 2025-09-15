@@ -34,9 +34,9 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
 
     companion object {
         private val ONE_BY_ONE_SIZE = DpSize(57.dp, 51.dp)
-        private val ONE_BY_TWO_SIZE = DpSize(57.dp, 117.dp)
+        private val ONE_BY_TWO_SIZE = DpSize(57.dp, 140.dp)
         private val TWO_BY_ONE_SIZE = DpSize(130.dp, 51.dp)
-        private val TWO_BY_TWO_SIZE = DpSize(130.dp, 117.dp)
+        private val TWO_BY_TWO_SIZE = DpSize(130.dp, 136.dp)
         private val THREE_BY_ONE_SIZE = DpSize(203.dp, 51.dp)
         private val THREE_BY_TWO_SIZE = DpSize(203.dp, 117.dp)
         private val THREE_BY_THREE_SIZE = DpSize(203.dp, 184.dp)
