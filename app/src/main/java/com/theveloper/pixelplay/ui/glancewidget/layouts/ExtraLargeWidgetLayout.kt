@@ -50,6 +50,8 @@ fun ExtraLargeWidgetLayout(
     queue: List<QueueItem>
 ) {
     val playButtonCornerRadius = if (isPlaying) 16.dp else 60.dp
+    val queueItemWidth = 58.dp
+    val queueItemHeight = 52.dp
 
     Box(
         modifier = modifier.background(backgroundColor).cornerRadius(bgCornerRadius).padding(12.dp)
@@ -136,7 +138,7 @@ fun ExtraLargeWidgetLayout(
 
                 Spacer(GlanceModifier.height(12.dp))
                 Row(
-                    modifier = GlanceModifier.fillMaxWidth().height(52.dp),
+                    modifier = GlanceModifier.fillMaxWidth().height(queueItemHeight),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val items = queue.take(4)
@@ -157,14 +159,14 @@ fun ExtraLargeWidgetLayout(
                                                 PlayerActions.songIdKey to queueItem.id
                                             )
                                         )
-                                    ).width(58.dp).height(52.dp),
+                                    ).width(queueItemWidth).height(queueItemHeight),
                                     bitmapData = queueItem.albumArtBitmapData,
                                     context = context,
                                     cornerRadius = cornerRadius
                                 )
                             } else {
                                 EndOfQueuePlaceholder(
-                                    height = 52.dp, width = 58.dp, cornerRadius = cornerRadius
+                                    height = queueItemHeight, width = queueItemWidth, cornerRadius = cornerRadius
                                 )
                             }
                         }
