@@ -11,11 +11,13 @@ import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.unit.ColorProvider
 import com.theveloper.pixelplay.ui.glancewidget.components.AlbumArtImageGlance
 import com.theveloper.pixelplay.ui.glancewidget.components.NextButtonGlance
@@ -38,7 +40,7 @@ fun GabeWidgetLayout(
 
     Box(
         modifier = modifier // Apply the base modifier for click handling and sizing
-            .background(backgroundColor).cornerRadius(bgCornerRadius),
+            .background(backgroundColor).cornerRadius(bgCornerRadius).padding(0.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -47,44 +49,54 @@ fun GabeWidgetLayout(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = GlanceModifier.fillMaxSize().cornerRadius(bgCornerRadius)) {
-                AlbumArtImageGlance(
-                    modifier = GlanceModifier.height(44.dp)
-                        .fillMaxWidth(), // Fills the width of the padded Column
-                    bitmapData = albumArtBitmapData, context = context, cornerRadius = 64.dp
-                )
+            Column(
+                modifier = GlanceModifier.fillMaxSize().cornerRadius(bgCornerRadius),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(modifier = GlanceModifier.fillMaxWidth().cornerRadius(360.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AlbumArtImageGlance(
+                        modifier = GlanceModifier.size(60.dp),
+                        bitmapData = albumArtBitmapData,
+                        context = context,
+                        cornerRadius = 360.dp
+                    )
+                }
+
                 Spacer(GlanceModifier.height(8.dp))
 
 
-            Column(
-                modifier = GlanceModifier.defaultWeight().cornerRadius(bgCornerRadius)
-            ) {
-                PreviousButtonGlance(
-                    modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
-                    iconColor = onSecondaryColor,
-                    iconSize = 26.dp,
-                    backgroundColor = secondaryColor,
-                    cornerRadius = 10.dp
-                )
-                Spacer(GlanceModifier.height(4.dp))
-                PlayPauseButtonGlance(
-                    modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
-                    backgroundColor = primaryContainerColor,
-                    iconColor = onPrimaryContainerColor,
-                    isPlaying = isPlaying,
-                    iconSize = 26.dp,
-                    cornerRadius = 10.dp
-                )
-                Spacer(GlanceModifier.height(4.dp))
-                NextButtonGlance(
-                    modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
-                    iconColor = onSecondaryColor,
-                    iconSize = 26.dp,
-                    backgroundColor = secondaryColor,
-                    cornerRadius = 10.dp
-                )
+                Column(
+                    modifier = GlanceModifier.defaultWeight().cornerRadius(bgCornerRadius - 10.dp)
+                ) {
+                    PreviousButtonGlance(
+                        modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
+                        iconColor = onSecondaryColor,
+                        iconSize = 26.dp,
+                        backgroundColor = secondaryColor,
+                        cornerRadius = 10.dp
+                    )
+                    Spacer(GlanceModifier.height(4.dp))
+                    PlayPauseButtonGlance(
+                        modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
+                        backgroundColor = primaryContainerColor,
+                        iconColor = onPrimaryContainerColor,
+                        isPlaying = isPlaying,
+                        iconSize = 26.dp,
+                        cornerRadius = 10.dp
+                    )
+                    Spacer(GlanceModifier.height(4.dp))
+                    NextButtonGlance(
+                        modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
+                        iconColor = onSecondaryColor,
+                        iconSize = 26.dp,
+                        backgroundColor = secondaryColor,
+                        cornerRadius = 10.dp
+                    )
+                }
             }
-        }
         }
     }
 }
