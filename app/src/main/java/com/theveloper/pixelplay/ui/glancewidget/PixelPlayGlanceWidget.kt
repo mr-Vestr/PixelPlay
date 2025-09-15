@@ -43,7 +43,7 @@ class PixelPlayGlanceWidget : GlanceAppWidget() {
         private val FOUR_BY_TWO_SIZE = DpSize(276.dp, 117.dp)
         private val FOUR_BY_THREE_SIZE = DpSize(276.dp, 184.dp)
         private val FOUR_BY_FOUR_SIZE = DpSize(276.dp, 250.dp)
-        private val FIVE_BY_THREE_SIZE = DpSize(349.dp, 184.dp)
+        private val FIVE_BY_THREE_SIZE = DpSize(349.dp, 216.dp)
         private val FIVE_BY_FOUR_SIZE = DpSize(349.dp, 250.dp)
         private val FIVE_BY_FIVE_SIZE = DpSize(349.dp, 316.dp)
     }
