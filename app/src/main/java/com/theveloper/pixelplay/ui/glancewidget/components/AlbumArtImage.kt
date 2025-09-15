@@ -21,6 +21,8 @@ import androidx.glance.layout.size
 import com.theveloper.pixelplay.R
 import timber.log.Timber
 
+private const val TAG_AAIG = "AlbumArtImageGlance"
+
 internal object AlbumArtBitmapCache {
     private const val CACHE_SIZE_BYTES = 4 * 1024 * 1024 // 4 MiB
     private val lruCache = object : LruCache<String, Bitmap>(CACHE_SIZE_BYTES) {
@@ -50,7 +52,6 @@ fun AlbumArtImageGlance(
     modifier: GlanceModifier = GlanceModifier,
     cornerRadius: Dp = 16.dp
 ) {
-    val TAG_AAIG = "AlbumArtImageGlance"
     Timber.tag(TAG_AAIG)
         .d("Init. bitmapData is null: ${bitmapData == null}. Requested Dp size: $size")
     if (bitmapData != null) Timber.tag(TAG_AAIG).d("bitmapData size: ${bitmapData.size} bytes")
