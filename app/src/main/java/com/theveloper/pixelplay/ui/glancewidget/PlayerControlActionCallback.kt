@@ -3,31 +3,51 @@ package com.theveloper.pixelplay.ui.glancewidget
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import androidx.annotation.OptIn
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.media3.common.util.UnstableApi
 import com.theveloper.pixelplay.data.service.MusicService
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 class PlayerControlActionCallback : ActionCallback {
-    private val TAG = "PlayerControlCallback"
+    private val tag = "PlayerControlCallback"
+    private val coroutineScope = MainScope()
 
     @OptIn(UnstableApi::class)
     override suspend fun onAction(
-        context: Context,
-        glanceId: GlanceId,
-        parameters: ActionParameters
+        context: Context, glanceId: GlanceId, parameters: ActionParameters
     ) {
         val action = parameters[PlayerActions.key]
-        Timber.tag(TAG).d("onAction received: $action for glanceId: $glanceId")
+        Timber.tag(tag).d("onAction received: $action for glanceId: $glanceId")
 
         if (action == null) {
-            Timber.tag(TAG).w("Action key not found in parameters.")
+            Timber.tag(tag).w("Action key not found in parameters.")
             return
         }
+
+        // Optimistic UI update for PLAY_PAUSE
+        if (action == PlayerActions.PLAY_PAUSE) {
+            coroutineScope.launch {
+                try {
+                    updateAppWidgetState(
+                        context,
+                        PlayerInfoStateDefinition,
+                        glanceId
+                    ) { currentState ->
+                        currentState.copy(isPlaying = !currentState.isPlaying)
+                    }
+                    PixelPlayGlanceWidget().update(context, glanceId)
+                } catch (e: Exception) {
+                    Timber.tag(tag).e(e, "Error during optimistic UI update for PLAY_PAUSE.")
+                }
+            }
+        }
+
 
         val serviceIntent = Intent(context, MusicService::class.java).apply {
             this.action = action
@@ -36,7 +56,7 @@ class PlayerControlActionCallback : ActionCallback {
                 if (songId != null) {
                     putExtra("song_id", songId)
                 } else {
-                    Timber.tag(TAG).w("PLAY_FROM_QUEUE action received but no songId found.")
+                    Timber.tag(tag).w("PLAY_FROM_QUEUE action received but no songId found.")
                     return // No hacer nada si no hay ID de canción
                 }
             }
@@ -48,9 +68,9 @@ class PlayerControlActionCallback : ActionCallback {
             } else {
                 context.startService(serviceIntent)
             }
-            Timber.tag(TAG).d("Service intent sent for action: $action")
+            Timber.tag(tag).d("Service intent sent for action: $action")
         } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Error starting service for action $action: ${e.message}")
+            Timber.tag(tag).e(e, "Error starting service for action $action: ${e.message}")
         }
     }
 }
