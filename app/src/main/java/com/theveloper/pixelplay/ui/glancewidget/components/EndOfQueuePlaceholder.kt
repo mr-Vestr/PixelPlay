@@ -11,10 +11,10 @@ import androidx.glance.layout.size
 
 @Composable
 fun EndOfQueuePlaceholder(
-    modifier: GlanceModifier = GlanceModifier, size: Dp, cornerRadius: Dp
+    modifier: GlanceModifier = GlanceModifier, width: Dp, height: Dp, cornerRadius: Dp
 ) {
     Box(
-        modifier = modifier.size(size).background(GlanceTheme.colors.surfaceVariant)
+        modifier = modifier.size(width, height).background(GlanceTheme.colors.surfaceVariant)
             .cornerRadius(cornerRadius)
     ) {
 

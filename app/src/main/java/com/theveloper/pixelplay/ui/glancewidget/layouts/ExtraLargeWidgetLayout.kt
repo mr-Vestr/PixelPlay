@@ -140,7 +140,6 @@ fun ExtraLargeWidgetLayout(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val items = queue.take(4)
-                    val itemSize = 58.dp
                     val cornerRadius = 14.dp
 
                     for (i in 0 until 4) {
@@ -158,15 +157,14 @@ fun ExtraLargeWidgetLayout(
                                                 PlayerActions.songIdKey to queueItem.id
                                             )
                                         )
-                                    ),
+                                    ).width(58.dp).height(52.dp),
                                     bitmapData = queueItem.albumArtBitmapData,
-                                    size = itemSize,
                                     context = context,
                                     cornerRadius = cornerRadius
                                 )
                             } else {
                                 EndOfQueuePlaceholder(
-                                    size = itemSize, cornerRadius = cornerRadius
+                                    height = 52.dp, width = 58.dp, cornerRadius = cornerRadius
                                 )
                             }
                         }
