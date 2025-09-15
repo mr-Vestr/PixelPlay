@@ -27,6 +27,7 @@ import com.theveloper.pixelplay.ui.glancewidget.components.NextButtonGlance
 import com.theveloper.pixelplay.ui.glancewidget.components.PlayPauseButtonGlance
 import com.theveloper.pixelplay.ui.glancewidget.components.PreviousButtonGlance
 import androidx.glance.layout.Alignment
+import androidx.glance.layout.Box
 
 @Composable
 fun MediumWidgetLayout(
