@@ -80,7 +80,7 @@ fun PixelPlayWidget_Preview_2x1() {
 }
 
 @OptIn(ExperimentalGlancePreviewApi::class)
-@Preview(widthDp = 130, heightDp = 117)
+@Preview(widthDp = 130, heightDp = 136)
 @Composable
 fun PixelPlayWidget_Preview_2x2() {
     PixelPlayGlanceWidgetPreviewProvider().Content()
@@ -129,7 +129,7 @@ fun PixelPlayWidget_Preview_4x4() {
 }
 
 @OptIn(ExperimentalGlancePreviewApi::class)
-@Preview(widthDp = 349, heightDp = 220)
+@Preview(widthDp = 349, heightDp = 216)
 @Composable
 fun PixelPlayWidget_Preview_5x3() {
     PixelPlayGlanceWidgetPreviewProvider().Content()
