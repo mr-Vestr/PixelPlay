@@ -718,20 +718,18 @@ class PlayerViewModel @Inject constructor(
                 val remoteMediaClient = _castSession.value?.remoteMediaClient ?: return
                 val mediaStatus = remoteMediaClient.mediaStatus ?: return
 
+                // Rebuild the queue from the remote source of truth
+                val remoteQueueItems = mediaStatus.queueItems ?: emptyList()
+                val songIdMap = _masterAllSongs.value.associateBy { it.id }
+                val newQueue = remoteQueueItems.mapNotNull {
+                    val songId = it.customData?.optString("songId")
+                    songIdMap[songId]
+                }.toImmutableList()
+
                 val currentItemId = mediaStatus.getCurrentItemId()
-                val currentSong = if (currentItemId == 0) {
-                    null
-                } else {
-                    val currentItem = mediaStatus.getQueueItemById(currentItemId)
-                    val contentId = currentItem?.media?.contentId ?: ""
-                    val serverAddress = MediaFileHttpServerService.serverAddress ?: ""
-                    if (contentId.startsWith("$serverAddress/song/")) {
-                        val songId = contentId.substringAfterLast('/')
-                        _playerUiState.value.currentPlaybackQueue.find { it.id == songId }
-                    } else {
-                        null
-                    }
-                }
+                val currentRemoteItem = mediaStatus.getQueueItemById(currentItemId)
+                val currentSongId = currentRemoteItem?.customData?.optString("songId")
+                val currentSong = songIdMap[currentSongId]
 
                 // Only trigger color update if the song has actually changed
                 if (currentSong?.id != _stablePlayerState.value.currentSong?.id) {
@@ -742,6 +740,8 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
 
+                // Update the local state to mirror the remote state
+                _playerUiState.update { it.copy(currentPlaybackQueue = newQueue) }
                 _stablePlayerState.update {
                     it.copy(
                         isPlaying = mediaStatus.playerState == MediaStatus.PLAYER_STATE_PLAYING,
@@ -859,6 +859,7 @@ class PlayerViewModel @Inject constructor(
                 val wasPlaying = remoteMediaClient.isPlaying
                 val repeatMode = remoteMediaStatus?.queueRepeatMode ?: MediaStatus.REPEAT_MODE_REPEAT_OFF
                 val isShuffleOn = repeatMode == MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
+                // The queue is now synchronized via onStatusUpdated, so we can trust it.
                 val queue = _playerUiState.value.currentPlaybackQueue.toList()
 
 
@@ -912,7 +913,7 @@ class PlayerViewModel @Inject constructor(
                         localPlayer.play() // This will trigger the listener to start progress updates
                     } else {
                         // Manually update the UI if not playing, as the listener won't fire.
-                         _playerUiState.update { it.copy(currentPosition = lastPosition) }
+                        _playerUiState.update { it.copy(currentPosition = lastPosition) }
                     }
                 }
             }
