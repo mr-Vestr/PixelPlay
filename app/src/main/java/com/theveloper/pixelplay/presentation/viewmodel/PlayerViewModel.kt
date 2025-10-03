@@ -774,6 +774,7 @@ class PlayerViewModel @Inject constructor(
 
                     localPlayer.pause()
                     stopProgressUpdates()
+                    delay(200) // Allow states to settle before loading on remote.
 
                     val mediaItems = currentQueue.map { song ->
                         val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
@@ -819,6 +820,10 @@ class PlayerViewModel @Inject constructor(
                             sendToast("Failed to load media on cast device.")
                             Timber.e("Remote media client failed to load queue: ${it.status.statusMessage}")
                             disconnect()
+                            // Resume local playback if transfer fails
+                            if (wasPlaying) {
+                                localPlayer.play()
+                            }
                         }
                     }
                     _castSession.value = session
