@@ -845,14 +845,19 @@ class PlayerViewModel @Inject constructor(
             private fun stopServerAndTransferBack() {
                 val session = _castSession.value ?: return
                 val remoteMediaClient = session.remoteMediaClient ?: return
-                val lastKnownStatus = remoteMediaClient.mediaStatus
-                val lastPosition = _remotePosition.value
-                val wasPlaying = lastKnownStatus?.playerState == MediaStatus.PLAYER_STATE_PLAYING
-                val lastItemId = lastKnownStatus?.currentItemId
-                val lastKnownQueue = _playerUiState.value.currentPlaybackQueue.toList()
-                val lastRepeatMode = lastKnownStatus?.queueRepeatMode ?: Player.REPEAT_MODE_OFF
-                val lastShuffleMode = lastRepeatMode == MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
 
+                // Capture the full remote state BEFORE disconnecting
+                val remoteMediaStatus = remoteMediaClient.mediaStatus
+                val remoteQueue = remoteMediaStatus?.queueItems
+                val currentItemId = remoteMediaStatus?.currentItemId
+                val lastPosition = remoteMediaClient.approximateStreamPosition
+                val wasPlaying = remoteMediaClient.isPlaying
+                val repeatMode = remoteMediaStatus?.queueRepeatMode ?: MediaStatus.REPEAT_MODE_REPEAT_OFF
+                val isShuffleOn = repeatMode == MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
+                val queue = _playerUiState.value.currentPlaybackQueue.toList()
+
+
+                // Stop remote listening and disconnect
                 remoteProgressObserverJob?.cancel()
                 remoteMediaClient.removeProgressListener(remoteProgressListener!!)
                 remoteMediaClient.unregisterCallback(remoteMediaClientCallback!!)
@@ -861,18 +866,20 @@ class PlayerViewModel @Inject constructor(
                 disconnect()
 
                 val localPlayer = mediaController ?: return
-                if (lastKnownQueue.isNotEmpty() && lastKnownStatus != null && lastItemId != null) {
-                    val remoteQueueItems = lastKnownStatus.queueItems ?: return
-                    val lastPlayedRemoteItem = remoteQueueItems.find { it.itemId == lastItemId } ?: return
-                    val lastPlayedSongId = lastPlayedRemoteItem.customData?.optString("songId")
+                if (queue.isNotEmpty() && remoteQueue != null && currentItemId != null && currentItemId != 0) {
+                    val lastPlayedRemoteItem = remoteQueue.find { it.itemId == currentItemId }
+                    val lastPlayedSongId = lastPlayedRemoteItem?.customData?.optString("songId")
 
                     val startIndex = if (lastPlayedSongId != null) {
-                        lastKnownQueue.indexOfFirst { it.id == lastPlayedSongId }
+                        queue.indexOfFirst { it.id == lastPlayedSongId }.coerceAtLeast(0)
                     } else {
-                        remoteQueueItems.indexOf(lastPlayedRemoteItem)
-                    }.coerceAtLeast(0)
+                        // Fallback if customData is missing, though it shouldn't be.
+                        remoteQueue.indexOf(lastPlayedRemoteItem).coerceAtLeast(0)
+                    }
 
-                    val mediaItems = lastKnownQueue.map { song ->
+                    if (startIndex >= queue.size) return // Safety check
+
+                    val mediaItems = queue.map { song ->
                         MediaItem.Builder()
                             .setMediaId(song.id)
                             .setUri(song.contentUriString.toUri())
@@ -886,8 +893,9 @@ class PlayerViewModel @Inject constructor(
                             .build()
                     }
 
-                    localPlayer.shuffleModeEnabled = lastShuffleMode
-                    localPlayer.repeatMode = when(lastRepeatMode) {
+                    // Restore the local player state
+                    localPlayer.shuffleModeEnabled = isShuffleOn
+                    localPlayer.repeatMode = when(repeatMode) {
                         MediaStatus.REPEAT_MODE_REPEAT_SINGLE -> Player.REPEAT_MODE_ONE
                         MediaStatus.REPEAT_MODE_REPEAT_ALL, MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE -> Player.REPEAT_MODE_ALL
                         else -> Player.REPEAT_MODE_OFF
@@ -896,12 +904,10 @@ class PlayerViewModel @Inject constructor(
                     localPlayer.setMediaItems(mediaItems, startIndex, lastPosition)
                     localPlayer.prepare()
                     if (wasPlaying) {
-                        localPlayer.play()
+                        localPlayer.play() // This will trigger the listener to start progress updates
                     } else {
-                        _playerUiState.update { it.copy(currentPosition = lastPosition) }
-                        if (_stablePlayerState.value.isPlaying) {
-                            startProgressUpdates()
-                        }
+                        // Manually update the UI if not playing, as the listener won't fire.
+                         _playerUiState.update { it.copy(currentPosition = lastPosition) }
                     }
                 }
             }
