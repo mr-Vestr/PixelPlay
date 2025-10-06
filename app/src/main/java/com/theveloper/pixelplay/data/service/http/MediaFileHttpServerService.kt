@@ -76,7 +76,8 @@ class MediaFileHttpServerService : Service() {
                                 }
 
                                 contentResolver.openInputStream(song.contentUriString.toUri())?.use { inputStream ->
-                                    call.respondOutputStream(contentType = ContentType.Audio.MPEG) {
+                                    val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(song.path)) ?: "audio/*"
+                                    call.respondOutputStream(contentType = ContentType.parse(mimeType)) {
                                         inputStream.copyTo(this)
                                     }
                                 } ?: call.respond(HttpStatusCode.InternalServerError, "Could not open song file")
