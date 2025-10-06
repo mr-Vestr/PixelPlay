@@ -39,7 +39,7 @@ import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 
 @Composable
 fun RemoteMiniPlayer(
-    song: Song,
+    song: Song?,
     isPlaying: Boolean,
     onPlayPause: () -> Unit,
     onDisconnect: () -> Unit,
@@ -53,20 +53,31 @@ fun RemoteMiniPlayer(
             .padding(start = 10.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SmartImage(
-            model = song.albumArtUriString ?: R.drawable.rounded_album_24,
-            contentDescription = "Album art for ${song.title}",
-            shape = CircleShape,
-            targetSize = Size(150, 150),
-            modifier = Modifier.size(44.dp)
-        )
+        if (song != null) {
+            SmartImage(
+                model = song.albumArtUriString ?: R.drawable.rounded_album_24,
+                contentDescription = "Album art for ${song.title}",
+                shape = CircleShape,
+                targetSize = Size(150, 150),
+                modifier = Modifier.size(44.dp)
+            )
+        } else {
+            Icon(
+                painter = painterResource(id = R.drawable.rounded_album_24),
+                contentDescription = "Connecting to cast device",
+                modifier = Modifier.size(44.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
+            )
+        }
+
         Spacer(modifier = Modifier.width(12.dp))
+
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = song.title,
+                text = song?.title ?: "Connecting...",
                 style = MaterialTheme.typography.titleSmall.copy(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -78,7 +89,7 @@ fun RemoteMiniPlayer(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "Casting to device...",
+                text = song?.artist ?: "Casting to device",
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontSize = 13.sp,
                     letterSpacing = 0.sp

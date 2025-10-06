@@ -20,6 +20,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -30,7 +31,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.theveloper.pixelplay.R
@@ -41,7 +41,7 @@ import kotlinx.collections.immutable.ImmutableList
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RemoteFullPlayer(
-    currentSong: Song,
+    currentSong: Song?,
     currentPosition: Long,
     totalDuration: Long,
     isPlaying: Boolean,
@@ -149,59 +149,68 @@ fun RemoteFullPlayer(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceAround
         ) {
-            val albumArtContainerModifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = lerp(4.dp, 8.dp, expansionFraction))
-                .height(lerp(150.dp, 260.dp, expansionFraction))
-                .graphicsLayer { alpha = expansionFraction }
-
-            AlbumCarouselSection(
-                currentSong = currentSong,
-                queue = queue,
-                expansionFraction = expansionFraction,
-                onSongSelected = onSongSelectedFromCarousel,
-                modifier = albumArtContainerModifier
-            )
-
-            SongMetadataDisplaySection(
-                song = currentSong,
-                expansionFraction = expansionFraction,
-                textColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                artistTextColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                onClickLyrics = { /* Lyrics not available in remote mode */ }
-            )
-
-            RemotePlaybackControls(
-                modifier = Modifier.padding(top = 16.dp),
-                onPlayPause = onPlayPause,
-                onNext = onNext,
-                onPrevious = onPrevious,
-                onSeek = onSeek,
-                onSeekStarted = onSeekStarted,
-                onSeekFinished = onSeekFinished,
-                isPlaying = isPlaying,
-                currentPosition = currentPosition,
-                totalDuration = totalDuration,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                thumbColor = MaterialTheme.colorScheme.primary,
-                timeTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            BottomToggleRow(
-                modifier = Modifier
+            if (currentSong != null) {
+                val albumArtContainerModifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 58.dp, max = 88.dp)
-                    .padding(horizontal = 26.dp, vertical = 8.dp),
-                isShuffleEnabled = isShuffleEnabled,
-                repeatMode = repeatMode,
-                isFavorite = isFavorite,
-                onShuffleToggle = onShuffleToggle,
-                onRepeatToggle = onRepeatToggle,
-                onFavoriteToggle = onFavoriteToggle
-            )
+                    .padding(vertical = lerp(4.dp, 8.dp, expansionFraction))
+                    .height(lerp(150.dp, 260.dp, expansionFraction))
+                    .graphicsLayer { alpha = expansionFraction }
+
+                AlbumCarouselSection(
+                    currentSong = currentSong,
+                    queue = queue,
+                    expansionFraction = expansionFraction,
+                    onSongSelected = onSongSelectedFromCarousel,
+                    modifier = albumArtContainerModifier
+                )
+
+                SongMetadataDisplaySection(
+                    song = currentSong,
+                    expansionFraction = expansionFraction,
+                    textColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    artistTextColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    onClickLyrics = { /* Lyrics not available in remote mode */ }
+                )
+
+                RemotePlaybackControls(
+                    modifier = Modifier.padding(top = 16.dp),
+                    onPlayPause = onPlayPause,
+                    onNext = onNext,
+                    onPrevious = onPrevious,
+                    onSeek = onSeek,
+                    onSeekStarted = onSeekStarted,
+                    onSeekFinished = onSeekFinished,
+                    isPlaying = isPlaying,
+                    currentPosition = currentPosition,
+                    totalDuration = totalDuration,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    timeTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                BottomToggleRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 58.dp, max = 88.dp)
+                        .padding(horizontal = 26.dp, vertical = 8.dp),
+                    isShuffleEnabled = isShuffleEnabled,
+                    repeatMode = repeatMode,
+                    isFavorite = isFavorite,
+                    onShuffleToggle = onShuffleToggle,
+                    onRepeatToggle = onRepeatToggle,
+                    onFavoriteToggle = onFavoriteToggle
+                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Connecting to device...")
+                }
+            }
         }
     }
 }

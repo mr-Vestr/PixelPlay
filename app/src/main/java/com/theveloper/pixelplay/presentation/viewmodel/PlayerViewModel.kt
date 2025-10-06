@@ -32,6 +32,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.webkit.MimeTypeMap
 import androidx.media3.session.SessionToken
 import androidx.mediarouter.media.MediaControlIntent
 import androidx.mediarouter.media.MediaRouteSelector
@@ -871,7 +872,7 @@ class PlayerViewModel @Inject constructor(
                 override fun onSessionResumeFailed(session: CastSession, error: Int) {}
             }
 
-            sessionManager?.addSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
+            sessionManager?.addSessionManagerListener(castSessionManagerListener, CastSession::class.java)
             _castSession.value = sessionManager?.currentCastSession
             _castSession.value?.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
             _castSession.value?.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
@@ -882,6 +883,10 @@ class PlayerViewModel @Inject constructor(
         // --- FIN: Bloque de Cast SDK Session Management ---
     }
 
+    /**
+     * Transición de Local a Remoto.
+     * Esta función es llamada cuando una sesión de Cast se inicia o reanuda.
+     */
     private fun transferPlayback(session: CastSession) {
         // 1. Capturar el estado del reproductor local INMEDIATAMENTE.
         val localPlayer = mediaController ?: return
@@ -926,8 +931,10 @@ class PlayerViewModel @Inject constructor(
                     addImage(WebImage(artUrl.toUri()))
                 }
                 val mediaUrl = "$serverAddress/song/${song.id}"
+                val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(song.contentUriString)) ?: "audio/mpeg"
                 val mediaInfo = MediaInfo.Builder(mediaUrl)
                     .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+                    .setContentType(mimeType)
                     .setMetadata(mediaMetadata)
                     .build()
 
@@ -956,6 +963,7 @@ class PlayerViewModel @Inject constructor(
                 // _playerUiState.update { it.copy(isConnectingToCast = false) }
                 if (it.status.isSuccess) {
                     Timber.i("Cola cargada en Cast con éxito.")
+                    _playerUiState.update { state -> state.copy(playbackMode = PlaybackMode.REMOTE) }
                     // Nota: El SDK de Cast debería manejar el autoplay basado en la sesión.
                     // Si 'wasPlaying' era true, debería empezar a sonar. Si no,
                     // forzarlo podría ser necesario en algunos dispositivos.
@@ -972,7 +980,6 @@ class PlayerViewModel @Inject constructor(
 
             // 7. Registrarse para recibir actualizaciones del reproductor remoto.
             _castSession.value = session
-            _playerUiState.update { it.copy(playbackMode = PlaybackMode.REMOTE) }
             session.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
             session.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
 
@@ -987,6 +994,11 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+
+    /**
+     * Transición de Remoto a Local.
+     * Esta función es llamada cuando la sesión de Cast termina.
+     */
     private fun stopServerAndTransferBack() {
         val session = _castSession.value ?: return
         val remoteMediaClient = session.remoteMediaClient ?: return
@@ -1001,7 +1013,6 @@ class PlayerViewModel @Inject constructor(
         remoteMediaClient.removeProgressListener(remoteProgressListener!!)
         remoteMediaClient.unregisterCallback(remoteMediaClientCallback!!)
         _castSession.value = null
-        _playerUiState.update { it.copy(playbackMode = PlaybackMode.LOCAL) }
         context.stopService(Intent(context, MediaFileHttpServerService::class.java))
         disconnect()
 
@@ -1010,12 +1021,12 @@ class PlayerViewModel @Inject constructor(
 
         if (lastKnownQueue.isNotEmpty() && lastKnownStatus != null) {
             // 3. Identificar la canción correcta usando el songId guardado.
-            val currentItemId = lastKnownStatus.getCurrentItemId()
-            val lastPlayedItem = if (currentItemId == 0) null else lastKnownStatus.getQueueItemById(currentItemId)
+            val lastPlayedItem = lastKnownStatus.currentItem
             val lastPlayedSongId = lastPlayedItem?.media?.customData?.optString("songId")
 
             if (lastPlayedSongId == null) {
                 Timber.w("No se pudo obtener el songId de la sesión de Cast. No se puede restaurar.")
+                _playerUiState.update { it.copy(playbackMode = PlaybackMode.LOCAL) }
                 return
             }
 
@@ -1050,11 +1061,19 @@ class PlayerViewModel @Inject constructor(
             // 6. Cargar la cola en el reproductor local, especificando el punto exacto de inicio.
             localPlayer.setMediaItems(mediaItems, startIndex, lastPosition)
             localPlayer.prepare()
+            _playerUiState.update { it.copy(playbackMode = PlaybackMode.LOCAL) }
+
 
             // 7. Reanudar la reproducción si estaba activa.
             if (wasPlaying) {
                 localPlayer.play()
             }
+
+            // Si no estaba sonando, el reproductor ya está en el punto correcto.
+            // La UI se actualizará en el próximo ciclo de `onPlaybackStateChanged` o
+            // a través de `startProgressUpdates` si se reanuda la reproducción.
+        } else {
+            _playerUiState.update { it.copy(playbackMode = PlaybackMode.LOCAL) }
         }
     }
 
@@ -2039,24 +2058,34 @@ class PlayerViewModel @Inject constructor(
 
     fun seekTo(position: Long) {
         val castSessionValue = _castSession.value
+        // --- MANEJO DE SEEK REMOTO ---
         if (castSessionValue != null && castSessionValue.remoteMediaClient != null) {
-            val remoteMediaClient = castSessionValue.remoteMediaClient!!
-
+            // Actualiza la UI local de forma optimista para que el slider se sienta responsivo.
             _playerUiState.update { it.copy(currentPosition = position) }
 
+            // El seek real se maneja en onSeekFinished para evitar sobrecargar al dispositivo remoto.
+
         }
+        // --- MANEJO DE SEEK LOCAL ---
         else {
             mediaController?.seekTo(position)
             _playerUiState.update { it.copy(currentPosition = position) }
         }
     }
 
+    /**
+     * Esta función debe llamarse cuando el usuario EMPIEZA a arrastrar el slider.
+     */
     fun onSeekStarted() {
         if (_castSession.value != null) {
             isRemotelySeeking.value = true
         }
     }
 
+    /**
+     * Esta función debe llamarse cuando el usuario TERMINA de arrastrar el slider.
+     * @param finalPosition La posición final en milisegundos donde el usuario soltó el slider.
+     */
     fun onSeekFinished(finalPosition: Long) {
         val castSessionValue = _castSession.value
         if (castSessionValue != null && castSessionValue.remoteMediaClient != null) {
@@ -2070,9 +2099,12 @@ class PlayerViewModel @Inject constructor(
                 if (!it.status.isSuccess) {
                     Timber.e("Remote media client failed to seek: ${it.status.statusMessage}")
                 }
+                // Cuando el seek termina, bajamos la bandera para que las actualizaciones
+                // del dispositivo remoto vuelvan a tomar control.
                 isRemotelySeeking.value = false
             }
         }
+        // Para el seek local, no necesitamos hacer nada aquí porque `seekTo` ya fue llamado.
     }
 
     fun nextSong() {

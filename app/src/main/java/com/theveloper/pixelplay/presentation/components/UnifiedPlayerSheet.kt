@@ -742,369 +742,366 @@ fun UnifiedPlayerSheet(
                     .padding(bottom = currentBottomPadding.value.dp)
             ) {
             // Use granular showDismissUndoBar and undoBarVisibleDuration
-            if (showPlayerContentArea) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .pointerInput(playerViewModel, showPlayerContentArea, currentSheetContentState, configuration, density, scope) {
-                                if (!showPlayerContentArea || currentSheetContentState != PlayerSheetState.COLLAPSED) {
-                                    scope.launch { offsetAnimatable.snapTo(0f) }
-                                    return@pointerInput
-                                }
-                                var accumulatedDragX by mutableFloatStateOf(0f)
-                                var dragPhase by mutableStateOf(DragPhase.IDLE)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(playerViewModel, showPlayerContentArea, currentSheetContentState, configuration, density, scope) {
+                        if (!showPlayerContentArea || currentSheetContentState != PlayerSheetState.COLLAPSED) {
+                            scope.launch { offsetAnimatable.snapTo(0f) }
+                            return@pointerInput
+                        }
+                        var accumulatedDragX by mutableFloatStateOf(0f)
+                        var dragPhase by mutableStateOf(DragPhase.IDLE)
 
-                                detectHorizontalDragGestures(
-                                    onDragStart = {
-                                        dragPhase = DragPhase.TENSION
-                                        accumulatedDragX = 0f
-                                        scope.launch { offsetAnimatable.stop() }
-                                    },
-                                    onHorizontalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        accumulatedDragX += dragAmount
+                        detectHorizontalDragGestures(
+                            onDragStart = {
+                                dragPhase = DragPhase.TENSION
+                                accumulatedDragX = 0f
+                                scope.launch { offsetAnimatable.stop() }
+                            },
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+                                accumulatedDragX += dragAmount
 
-                                        when (dragPhase) {
-                                            DragPhase.TENSION -> {
-                                                val snapThresholdPx = with(density) { 100.dp.toPx() }
-                                                if (abs(accumulatedDragX) < snapThresholdPx) {
-                                                    val maxTensionOffsetPx = with(density) { 30.dp.toPx() }
-                                                    val dragFraction = (abs(accumulatedDragX) / snapThresholdPx).coerceIn(0f, 1f)
-                                                    val tensionOffset = lerp(0f, maxTensionOffsetPx, dragFraction)
-                                                    scope.launch { offsetAnimatable.snapTo(tensionOffset * accumulatedDragX.sign) }
-                                                } else {
-                                                    // Threshold crossed, transition to the snap phase
-                                                    dragPhase = DragPhase.SNAPPING
-                                                }
-                                            }
-                                            DragPhase.SNAPPING -> {
-                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                // On the first frame of snapping, launch the soft spring animation
-                                                scope.launch {
-                                                    offsetAnimatable.animateTo(
-                                                        targetValue = accumulatedDragX,
-                                                        animationSpec = spring(
-                                                            dampingRatio = 0.8f,
-                                                            stiffness = Spring.StiffnessLow
-                                                        )
-                                                    )
-                                                }
-                                                // Immediately transition to free drag so subsequent events are handled there
-                                                dragPhase = DragPhase.FREE_DRAG
-                                            }
-                                            DragPhase.FREE_DRAG -> {
-                                                // After the initial snap, track the finger with a very stiff spring to feel 1-to-1
-                                                scope.launch {
-                                                    offsetAnimatable.animateTo(
-                                                        targetValue = accumulatedDragX,
-                                                        animationSpec = spring(
-                                                            dampingRatio = Spring.DampingRatioNoBouncy,
-                                                            stiffness = Spring.StiffnessHigh
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                            else -> {}
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        dragPhase = DragPhase.IDLE
-                                        val dismissThreshold = screenWidthPx * 0.4f
-                                        if (abs(accumulatedDragX) > dismissThreshold) {
-                                            val targetDismissOffset = if (accumulatedDragX < 0) -screenWidthPx else screenWidthPx
-                                            scope.launch {
-                                                offsetAnimatable.animateTo(
-                                                    targetValue = targetDismissOffset,
-                                                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
-                                                )
-                                                playerViewModel.dismissPlaylistAndShowUndo()
-                                                offsetAnimatable.snapTo(0f)
-                                            }
+                                when (dragPhase) {
+                                    DragPhase.TENSION -> {
+                                        val snapThresholdPx = with(density) { 100.dp.toPx() }
+                                        if (abs(accumulatedDragX) < snapThresholdPx) {
+                                            val maxTensionOffsetPx = with(density) { 30.dp.toPx() }
+                                            val dragFraction = (abs(accumulatedDragX) / snapThresholdPx).coerceIn(0f, 1f)
+                                            val tensionOffset = lerp(0f, maxTensionOffsetPx, dragFraction)
+                                            scope.launch { offsetAnimatable.snapTo(tensionOffset * accumulatedDragX.sign) }
                                         } else {
-                                            scope.launch {
-                                                offsetAnimatable.animateTo(
-                                                    targetValue = 0f,
-                                                    animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                        stiffness = Spring.StiffnessMedium
-                                                    )
-                                                )
-                                            }
+                                            // Threshold crossed, transition to the snap phase
+                                            dragPhase = DragPhase.SNAPPING
                                         }
                                     }
-                                )
-                            }
-                            .padding(horizontal = currentHorizontalPadding)
-                            .height(playerContentAreaActualHeightDp)
-                            .graphicsLayer {
-                                translationX = offsetAnimatable.value
-                                scaleY = visualOvershootScaleY.value
-                                transformOrigin = TransformOrigin(0.5f, 1f)
-                            }
-                            .shadow(
-                                elevation = playerAreaElevation,
-                                shape = playerShadowShape,
-                                clip = false
-                            )
-                            .background(
-                                color = albumColorScheme.primaryContainer,
-                                shape = AbsoluteSmoothCornerShape(
-                                    cornerRadiusTL = overallSheetTopCornerRadius,
-                                    smoothnessAsPercentBL = 60,
-                                    cornerRadiusTR = overallSheetTopCornerRadius,
-                                    smoothnessAsPercentBR = 60,
-                                    cornerRadiusBR = playerContentActualBottomRadius,
-                                    smoothnessAsPercentTL = 60,
-                                    cornerRadiusBL = playerContentActualBottomRadius,
-                                    smoothnessAsPercentTR = 60
-                                )
-                            )
-                            .clipToBounds()
-                            .pointerInput(
-                                showPlayerContentArea,
-                                sheetCollapsedTargetY,
-                                sheetExpandedTargetY,
-                                currentSheetContentState
-                            ) {
-                                if (!showPlayerContentArea) return@pointerInput
-                                var initialFractionOnDragStart = 0f
-                                var initialYOnDragStart = 0f
-                                detectVerticalDragGestures(
-                                    onDragStart = { offset ->
+                                    DragPhase.SNAPPING -> {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        // On the first frame of snapping, launch the soft spring animation
                                         scope.launch {
-                                            currentSheetTranslationY.stop()
-                                            playerContentExpansionFraction.stop()
-                                        }
-                                        isDragging = true
-                                        isDraggingPlayerArea = true
-                                        velocityTracker.resetTracking()
-                                        initialFractionOnDragStart = playerContentExpansionFraction.value
-                                        initialYOnDragStart = currentSheetTranslationY.value
-                                        accumulatedDragYSinceStart = 0f
-                                    },
-                                    onVerticalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        accumulatedDragYSinceStart += dragAmount
-                                        scope.launch {
-                                            val newY = (currentSheetTranslationY.value + dragAmount)
-                                                .coerceIn(
-                                                    sheetExpandedTargetY - miniPlayerContentHeightPx * 0.2f,
-                                                    sheetCollapsedTargetY + miniPlayerContentHeightPx * 0.2f
+                                            offsetAnimatable.animateTo(
+                                                targetValue = accumulatedDragX,
+                                                animationSpec = spring(
+                                                    dampingRatio = 0.8f,
+                                                    stiffness = Spring.StiffnessLow
                                                 )
-                                            currentSheetTranslationY.snapTo(newY)
-                                            val dragRatio =
-                                                (initialYOnDragStart - newY) / (sheetCollapsedTargetY - sheetExpandedTargetY).coerceAtLeast(
-                                                    1f
-                                                )
-                                            val newFraction =
-                                                (initialFractionOnDragStart + dragRatio).coerceIn(0f, 1f)
-                                            playerContentExpansionFraction.snapTo(newFraction)
+                                            )
                                         }
-                                        velocityTracker.addPosition(change.uptimeMillis, change.position)
-                                    },
-                                    onDragEnd = {
-                                        isDragging = false
-                                        isDraggingPlayerArea = false
-                                        val verticalVelocity = velocityTracker.calculateVelocity().y
-                                        val currentExpansionFraction = playerContentExpansionFraction.value
-                                        val minDragThresholdPx =
-                                            with(density) { 5.dp.toPx() }
-                                        val velocityThresholdForInstantTrigger =
-                                            150f
-                                        val targetContentState = when {
-                                            abs(accumulatedDragYSinceStart) > minDragThresholdPx -> {
-                                                if (accumulatedDragYSinceStart < 0) PlayerSheetState.EXPANDED else PlayerSheetState.COLLAPSED
-                                            }
-                                            abs(verticalVelocity) > velocityThresholdForInstantTrigger -> {
-                                                if (verticalVelocity < 0) PlayerSheetState.EXPANDED else PlayerSheetState.COLLAPSED
-                                            }
-                                            else -> {
-                                                if (currentExpansionFraction > 0.5f) PlayerSheetState.EXPANDED else PlayerSheetState.COLLAPSED
-                                            }
-                                        }
-                                        scope.launch {
-                                            if (targetContentState == PlayerSheetState.EXPANDED) {
-                                                launch {
-                                                    currentSheetTranslationY.animateTo(
-                                                        targetValue = sheetExpandedTargetY,
-                                                        animationSpec = tween(
-                                                            durationMillis = ANIMATION_DURATION_MS,
-                                                            easing = FastOutSlowInEasing
-                                                        )
-                                                    )
-                                                }
-                                                launch {
-                                                    playerContentExpansionFraction.animateTo(
-                                                        targetValue = 1f,
-                                                        animationSpec = tween(
-                                                            durationMillis = ANIMATION_DURATION_MS,
-                                                            easing = FastOutSlowInEasing
-                                                        )
-                                                    )
-                                                }
-                                                playerViewModel.expandPlayerSheet()
-                                            } else {
-                                                val dynamicDampingRatio = lerp(
-                                                    start = Spring.DampingRatioNoBouncy,
-                                                    stop = Spring.DampingRatioLowBouncy,
-                                                    fraction = currentExpansionFraction
-                                                )
-                                                // New logic for scale animation
-                                                launch {
-                                                    val initialSquash = lerp(1.0f, 0.97f, currentExpansionFraction)
-                                                    visualOvershootScaleY.snapTo(initialSquash)
-                                                    visualOvershootScaleY.animateTo(
-                                                        targetValue = 1f,
-                                                        animationSpec = spring(
-                                                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                            stiffness = Spring.StiffnessVeryLow
-                                                        )
-                                                    )
-                                                }
-                                                launch {
-                                                    currentSheetTranslationY.animateTo(
-                                                        targetValue = sheetCollapsedTargetY,
-                                                        initialVelocity = verticalVelocity,
-                                                        animationSpec = spring(
-                                                            dampingRatio = dynamicDampingRatio,
-                                                            stiffness = Spring.StiffnessLow
-                                                        )
-                                                    )
-                                                }
-                                                launch {
-                                                    playerContentExpansionFraction.animateTo(
-                                                        targetValue = 0f,
-                                                        initialVelocity = verticalVelocity / (sheetCollapsedTargetY - sheetExpandedTargetY).coerceAtLeast(1f),
-                                                        animationSpec = spring(
-                                                            dampingRatio = dynamicDampingRatio,
-                                                            stiffness = Spring.StiffnessLow
-                                                        )
-                                                    )
-                                                }
-                                                playerViewModel.collapsePlayerSheet()
-                                            }
-                                        }
-                                        accumulatedDragYSinceStart = 0f
+                                        // Immediately transition to free drag so subsequent events are handled there
+                                        dragPhase = DragPhase.FREE_DRAG
                                     }
-                                )
+                                    DragPhase.FREE_DRAG -> {
+                                        // After the initial snap, track the finger with a very stiff spring to feel 1-to-1
+                                        scope.launch {
+                                            offsetAnimatable.animateTo(
+                                                targetValue = accumulatedDragX,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessHigh
+                                                )
+                                            )
+                                        }
+                                    }
+                                    else -> {}
+                                }
+                            },
+                            onDragEnd = {
+                                dragPhase = DragPhase.IDLE
+                                val dismissThreshold = screenWidthPx * 0.4f
+                                if (abs(accumulatedDragX) > dismissThreshold) {
+                                    val targetDismissOffset = if (accumulatedDragX < 0) -screenWidthPx else screenWidthPx
+                                    scope.launch {
+                                        offsetAnimatable.animateTo(
+                                            targetValue = targetDismissOffset,
+                                            animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                                        )
+                                        playerViewModel.dismissPlaylistAndShowUndo()
+                                        offsetAnimatable.snapTo(0f)
+                                    }
+                                } else {
+                                    scope.launch {
+                                        offsetAnimatable.animateTo(
+                                            targetValue = 0f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMedium
+                                            )
+                                        )
+                                    }
+                                }
                             }
-                            .clickable(
-                                enabled = true,
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                playerViewModel.togglePlayerSheetState()
-                            }
+                        )
+                    }
+                    .padding(horizontal = currentHorizontalPadding)
+                    .height(playerContentAreaActualHeightDp)
+                    .graphicsLayer {
+                        translationX = offsetAnimatable.value
+                        scaleY = visualOvershootScaleY.value
+                        transformOrigin = TransformOrigin(0.5f, 1f)
+                    }
+                    .shadow(
+                        elevation = playerAreaElevation,
+                        shape = playerShadowShape,
+                        clip = false
+                    )
+                    .background(
+                        color = albumColorScheme.primaryContainer,
+                        shape = AbsoluteSmoothCornerShape(
+                            cornerRadiusTL = overallSheetTopCornerRadius,
+                            smoothnessAsPercentBL = 60,
+                            cornerRadiusTR = overallSheetTopCornerRadius,
+                            smoothnessAsPercentBR = 60,
+                            cornerRadiusBR = playerContentActualBottomRadius,
+                            smoothnessAsPercentTL = 60,
+                            cornerRadiusBL = playerContentActualBottomRadius,
+                            smoothnessAsPercentTR = 60
+                        )
+                    )
+                    .clipToBounds()
+                    .pointerInput(
+                        showPlayerContentArea,
+                        sheetCollapsedTargetY,
+                        sheetExpandedTargetY,
+                        currentSheetContentState
                     ) {
-                        if (showPlayerContentArea) {
-                            CompositionLocalProvider(
-                                LocalMaterialTheme provides (albumColorScheme ?: MaterialTheme.colorScheme)
-                            ) {
-                                when (playbackMode) {
-                                    PlaybackMode.LOCAL -> {
-                                        stablePlayerState.currentSong?.let { song ->
-                                            val miniPlayerAlpha by remember { derivedStateOf { (1f - playerContentExpansionFraction.value * 2f).coerceIn(0f, 1f) } }
-                                            if (miniPlayerAlpha > 0.01f) {
-                                                Box(modifier = Modifier.align(Alignment.TopCenter).graphicsLayer { alpha = miniPlayerAlpha }) {
-                                                    MiniPlayerContentInternal(
-                                                        song = song,
-                                                        cornerRadiusAlb = (overallSheetTopCornerRadius.value * 0.5).dp,
-                                                        isPlaying = stablePlayerState.isPlaying,
-                                                        onPlayPause = { playerViewModel.playPause() },
-                                                        onNext = { playerViewModel.nextSong() },
-                                                        modifier = Modifier.fillMaxSize()
-                                                    )
-                                                }
-                                            }
-                                            if (fullPlayerContentAlpha > 0f) {
-                                                Box(modifier = Modifier.graphicsLayer { alpha = fullPlayerContentAlpha; translationY = fullPlayerTranslationY }) {
-                                                    FullPlayerContentInternal(
-                                                        currentSong = song,
-                                                        currentPosition = positionToDisplay,
-                                                        currentPlaybackQueue = currentPlaybackQueue,
-                                                        currentQueueSourceName = currentQueueSourceName,
-                                                        isPlaying = stablePlayerState.isPlaying,
-                                                        isShuffleEnabled = stablePlayerState.isShuffleEnabled,
-                                                        repeatMode = stablePlayerState.repeatMode,
-                                                        isFavorite = playerViewModel.isCurrentSongFavorite.collectAsState().value,
-                                                        onPlayPause = { playerViewModel.playPause() },
-                                                        onSeek = { playerViewModel.seekTo(it) },
-                                                        onNext = { playerViewModel.nextSong() },
-                                                        onPrevious = { playerViewModel.previousSong() },
-                                                        onCollapse = { playerViewModel.collapsePlayerSheet() },
-                                                        expansionFraction = playerContentExpansionFraction.value,
-                                                        currentSheetState = currentSheetContentState,
-                                                        onShowQueueClicked = { showQueueSheet = true },
-                                                        onShowCastClicked = { showCastSheet = true },
-                                                        onShuffleToggle = { playerViewModel.toggleShuffle() },
-                                                        onRepeatToggle = { playerViewModel.cycleRepeatMode() },
-                                                        onFavoriteToggle = { playerViewModel.toggleFavorite() },
-                                                        playerViewModel = playerViewModel,
-                                                        onSeekStarted = { playerViewModel.onSeekStarted() },
-                                                        onSeekFinished = { playerViewModel.onSeekFinished(it) },
-                                                        playbackMode = playbackMode
-                                                    )
-                                                }
-                                            }
+                        if (!showPlayerContentArea) return@pointerInput
+                        var initialFractionOnDragStart = 0f
+                        var initialYOnDragStart = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { offset ->
+                                scope.launch {
+                                    currentSheetTranslationY.stop()
+                                    playerContentExpansionFraction.stop()
+                                }
+                                isDragging = true
+                                isDraggingPlayerArea = true
+                                velocityTracker.resetTracking()
+                                initialFractionOnDragStart = playerContentExpansionFraction.value
+                                initialYOnDragStart = currentSheetTranslationY.value
+                                accumulatedDragYSinceStart = 0f
+                            },
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                accumulatedDragYSinceStart += dragAmount
+                                scope.launch {
+                                    val newY = (currentSheetTranslationY.value + dragAmount)
+                                        .coerceIn(
+                                            sheetExpandedTargetY - miniPlayerContentHeightPx * 0.2f,
+                                            sheetCollapsedTargetY + miniPlayerContentHeightPx * 0.2f
+                                        )
+                                    currentSheetTranslationY.snapTo(newY)
+                                    val dragRatio =
+                                        (initialYOnDragStart - newY) / (sheetCollapsedTargetY - sheetExpandedTargetY).coerceAtLeast(
+                                            1f
+                                        )
+                                    val newFraction =
+                                        (initialFractionOnDragStart + dragRatio).coerceIn(0f, 1f)
+                                    playerContentExpansionFraction.snapTo(newFraction)
+                                }
+                                velocityTracker.addPosition(change.uptimeMillis, change.position)
+                            },
+                            onDragEnd = {
+                                isDragging = false
+                                isDraggingPlayerArea = false
+                                val verticalVelocity = velocityTracker.calculateVelocity().y
+                                val currentExpansionFraction = playerContentExpansionFraction.value
+                                val minDragThresholdPx =
+                                    with(density) { 5.dp.toPx() }
+                                val velocityThresholdForInstantTrigger =
+                                    150f
+                                val targetContentState = when {
+                                    abs(accumulatedDragYSinceStart) > minDragThresholdPx -> {
+                                        if (accumulatedDragYSinceStart < 0) PlayerSheetState.EXPANDED else PlayerSheetState.COLLAPSED
+                                    }
+                                    abs(verticalVelocity) > velocityThresholdForInstantTrigger -> {
+                                        if (verticalVelocity < 0) PlayerSheetState.EXPANDED else PlayerSheetState.COLLAPSED
+                                    }
+                                    else -> {
+                                        if (currentExpansionFraction > 0.5f) PlayerSheetState.EXPANDED else PlayerSheetState.COLLAPSED
+                                    }
+                                }
+                                scope.launch {
+                                    if (targetContentState == PlayerSheetState.EXPANDED) {
+                                        launch {
+                                            currentSheetTranslationY.animateTo(
+                                                targetValue = sheetExpandedTargetY,
+                                                animationSpec = tween(
+                                                    durationMillis = ANIMATION_DURATION_MS,
+                                                    easing = FastOutSlowInEasing
+                                                )
+                                            )
+                                        }
+                                        launch {
+                                            playerContentExpansionFraction.animateTo(
+                                                targetValue = 1f,
+                                                animationSpec = tween(
+                                                    durationMillis = ANIMATION_DURATION_MS,
+                                                    easing = FastOutSlowInEasing
+                                                )
+                                            )
+                                        }
+                                        playerViewModel.expandPlayerSheet()
+                                    } else {
+                                        val dynamicDampingRatio = lerp(
+                                            start = Spring.DampingRatioNoBouncy,
+                                            stop = Spring.DampingRatioLowBouncy,
+                                            fraction = currentExpansionFraction
+                                        )
+                                        // New logic for scale animation
+                                        launch {
+                                            val initialSquash = lerp(1.0f, 0.97f, currentExpansionFraction)
+                                            visualOvershootScaleY.snapTo(initialSquash)
+                                            visualOvershootScaleY.animateTo(
+                                                targetValue = 1f,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                    stiffness = Spring.StiffnessVeryLow
+                                                )
+                                            )
+                                        }
+                                        launch {
+                                            currentSheetTranslationY.animateTo(
+                                                targetValue = sheetCollapsedTargetY,
+                                                initialVelocity = verticalVelocity,
+                                                animationSpec = spring(
+                                                    dampingRatio = dynamicDampingRatio,
+                                                    stiffness = Spring.StiffnessLow
+                                                )
+                                            )
+                                        }
+                                        launch {
+                                            playerContentExpansionFraction.animateTo(
+                                                targetValue = 0f,
+                                                initialVelocity = verticalVelocity / (sheetCollapsedTargetY - sheetExpandedTargetY).coerceAtLeast(1f),
+                                                animationSpec = spring(
+                                                    dampingRatio = dynamicDampingRatio,
+                                                    stiffness = Spring.StiffnessLow
+                                                )
+                                            )
+                                        }
+                                        playerViewModel.collapsePlayerSheet()
+                                    }
+                                }
+                                accumulatedDragYSinceStart = 0f
+                            }
+                        )
+                    }
+                    .clickable(
+                        enabled = true,
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        playerViewModel.togglePlayerSheetState()
+                    }
+            ) {
+                if (showPlayerContentArea) {
+                    CompositionLocalProvider(
+                        LocalMaterialTheme provides (albumColorScheme ?: MaterialTheme.colorScheme)
+                    ) {
+                        when (playbackMode) {
+                            PlaybackMode.LOCAL -> {
+                                stablePlayerState.currentSong?.let { song ->
+                                    val miniPlayerAlpha by remember { derivedStateOf { (1f - playerContentExpansionFraction.value * 2f).coerceIn(0f, 1f) } }
+                                    if (miniPlayerAlpha > 0.01f) {
+                                        Box(modifier = Modifier.align(Alignment.TopCenter).graphicsLayer { alpha = miniPlayerAlpha }) {
+                                            MiniPlayerContentInternal(
+                                                song = song,
+                                                cornerRadiusAlb = (overallSheetTopCornerRadius.value * 0.5).dp,
+                                                isPlaying = stablePlayerState.isPlaying,
+                                                onPlayPause = { playerViewModel.playPause() },
+                                                onNext = { playerViewModel.nextSong() },
+                                                modifier = Modifier.fillMaxSize()
+                                            )
                                         }
                                     }
-                                    PlaybackMode.REMOTE -> {
-                                        stablePlayerState.currentSong?.let { song ->
-                                            val miniPlayerAlpha by remember { derivedStateOf { (1f - playerContentExpansionFraction.value * 2f).coerceIn(0f, 1f) } }
-                                            if (miniPlayerAlpha > 0.01f) {
-                                                Box(modifier = Modifier.align(Alignment.TopCenter).graphicsLayer { alpha = miniPlayerAlpha }) {
-                                                    RemoteMiniPlayer(
-                                                        song = song,
-                                                        isPlaying = stablePlayerState.isPlaying,
-                                                        onPlayPause = { playerViewModel.playPause() },
-                                                        onDisconnect = { playerViewModel.disconnect() },
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        cornerRadius = (overallSheetTopCornerRadius.value * 0.5).dp
-                                                    )
-                                                }
-                                            }
-                                            if (fullPlayerContentAlpha > 0f) {
-                                                Box(modifier = Modifier.graphicsLayer { alpha = fullPlayerContentAlpha; translationY = fullPlayerTranslationY }) {
-                                                    RemoteFullPlayer(
-                                                        currentSong = song,
-                                                        currentPosition = positionToDisplay,
-                                                        totalDuration = stablePlayerState.totalDuration,
-                                                        isPlaying = stablePlayerState.isPlaying,
-                                                        isShuffleEnabled = stablePlayerState.isShuffleEnabled,
-                                                        repeatMode = stablePlayerState.repeatMode,
-                                                        isFavorite = playerViewModel.isCurrentSongFavorite.collectAsState().value,
-                                                        onPlayPause = { playerViewModel.playPause() },
-                                                        onNext = { playerViewModel.nextSong() },
-                                                        onPrevious = { playerViewModel.previousSong() },
-                                                        onSeek = { playerViewModel.seekTo(it) },
-                                                        onSeekStarted = { playerViewModel.onSeekStarted() },
-                                                        onSeekFinished = { playerViewModel.onSeekFinished(it) },
-                                                        onCollapse = { playerViewModel.collapsePlayerSheet() },
-                                                        onShowCastClicked = { showCastSheet = true },
-                                                        onShowQueueClicked = { showQueueSheet = true },
-                                                        onShuffleToggle = { playerViewModel.toggleShuffle() },
-                                                        onRepeatToggle = { playerViewModel.cycleRepeatMode() },
-                                                        onFavoriteToggle = { playerViewModel.toggleFavorite() },
-                                                        expansionFraction = playerContentExpansionFraction.value,
-                                                        queue = currentPlaybackQueue,
-                                                        onSongSelectedFromCarousel = { selectedSong ->
-                                                            playerViewModel.showAndPlaySong(
-                                                                song = selectedSong,
-                                                                contextSongs = currentPlaybackQueue,
-                                                                queueName = currentQueueSourceName
-                                                            )
-                                                        },
-                                                        playerViewModel = playerViewModel
-                                                    )
-                                                }
-                                            }
+                                    if (fullPlayerContentAlpha > 0f) {
+                                        Box(modifier = Modifier.graphicsLayer { alpha = fullPlayerContentAlpha; translationY = fullPlayerTranslationY }) {
+                                            FullPlayerContentInternal(
+                                                currentSong = song,
+                                                currentPosition = positionToDisplay,
+                                                currentPlaybackQueue = currentPlaybackQueue,
+                                                currentQueueSourceName = currentQueueSourceName,
+                                                isPlaying = stablePlayerState.isPlaying,
+                                                isShuffleEnabled = stablePlayerState.isShuffleEnabled,
+                                                repeatMode = stablePlayerState.repeatMode,
+                                                isFavorite = playerViewModel.isCurrentSongFavorite.collectAsState().value,
+                                                onPlayPause = { playerViewModel.playPause() },
+                                                onSeek = { playerViewModel.seekTo(it) },
+                                                onNext = { playerViewModel.nextSong() },
+                                                onPrevious = { playerViewModel.previousSong() },
+                                                onCollapse = { playerViewModel.collapsePlayerSheet() },
+                                                expansionFraction = playerContentExpansionFraction.value,
+                                                currentSheetState = currentSheetContentState,
+                                                onShowQueueClicked = { showQueueSheet = true },
+                                                onShowCastClicked = { showCastSheet = true },
+                                                onShuffleToggle = { playerViewModel.toggleShuffle() },
+                                                onRepeatToggle = { playerViewModel.cycleRepeatMode() },
+                                                onFavoriteToggle = { playerViewModel.toggleFavorite() },
+                                                playerViewModel = playerViewModel,
+                                                onSeekStarted = { playerViewModel.onSeekStarted() },
+                                                onSeekFinished = { playerViewModel.onSeekFinished(it) },
+                                                playbackMode = playbackMode
+                                            )
                                         }
+                                    }
+                                }
+                            }
+                            PlaybackMode.REMOTE -> {
+                                val song = stablePlayerState.currentSong
+                                val miniPlayerAlpha by remember { derivedStateOf { (1f - playerContentExpansionFraction.value * 2f).coerceIn(0f, 1f) } }
+                                if (miniPlayerAlpha > 0.01f) {
+                                    Box(modifier = Modifier.align(Alignment.TopCenter).graphicsLayer { alpha = miniPlayerAlpha }) {
+                                        RemoteMiniPlayer(
+                                            song = song, // Pass nullable song
+                                            isPlaying = stablePlayerState.isPlaying,
+                                            onPlayPause = { playerViewModel.playPause() },
+                                            onDisconnect = { playerViewModel.disconnect() },
+                                            modifier = Modifier.fillMaxSize(),
+                                            cornerRadius = (overallSheetTopCornerRadius.value * 0.5).dp
+                                        )
+                                    }
+                                }
+                                if (fullPlayerContentAlpha > 0f) {
+                                    Box(modifier = Modifier.graphicsLayer { alpha = fullPlayerContentAlpha; translationY = fullPlayerTranslationY }) {
+                                        RemoteFullPlayer(
+                                            currentSong = song, // Pass nullable song
+                                            currentPosition = positionToDisplay,
+                                            totalDuration = stablePlayerState.totalDuration,
+                                            isPlaying = stablePlayerState.isPlaying,
+                                            isShuffleEnabled = stablePlayerState.isShuffleEnabled,
+                                            repeatMode = stablePlayerState.repeatMode,
+                                            isFavorite = playerViewModel.isCurrentSongFavorite.collectAsState().value,
+                                            onPlayPause = { playerViewModel.playPause() },
+                                            onNext = { playerViewModel.nextSong() },
+                                            onPrevious = { playerViewModel.previousSong() },
+                                            onSeek = { playerViewModel.seekTo(it) },
+                                            onSeekStarted = { playerViewModel.onSeekStarted() },
+                                            onSeekFinished = { playerViewModel.onSeekFinished(it) },
+                                            onCollapse = { playerViewModel.collapsePlayerSheet() },
+                                            onShowCastClicked = { showCastSheet = true },
+                                            onShowQueueClicked = { showQueueSheet = true },
+                                            onShuffleToggle = { playerViewModel.toggleShuffle() },
+                                            onRepeatToggle = { playerViewModel.cycleRepeatMode() },
+                                            onFavoriteToggle = { playerViewModel.toggleFavorite() },
+                                            expansionFraction = playerContentExpansionFraction.value,
+                                            queue = currentPlaybackQueue,
+                                            onSongSelectedFromCarousel = { selectedSong ->
+                                                playerViewModel.showAndPlaySong(
+                                                    song = selectedSong,
+                                                    contextSongs = currentPlaybackQueue,
+                                                    queueName = currentQueueSourceName
+                                                )
+                                            },
+                                            playerViewModel = playerViewModel
+                                        )
                                     }
                                 }
                             }
                         }
                     }
                 }
+            }
 
                 // Use granular showDismissUndoBar
                 val isPlayerOrUndoBarVisible = showPlayerContentArea || showDismissUndoBar
@@ -1220,6 +1217,8 @@ private fun PlayerProgressBarSection(
     totalDurationValue: Long,
     progressFractionValue: Float,
     onSeek: (Long) -> Unit,
+    onSeekStarted: () -> Unit,
+    onSeekFinished: (Long) -> Unit,
     expansionFraction: Float,
     isPlaying: Boolean,
     currentSheetState: PlayerSheetState,
@@ -1244,11 +1243,15 @@ private fun PlayerProgressBarSection(
         WavyMusicSlider(
             value = sliderDragValue ?: progressFractionValue,
             onValueChange = { newValue ->
+                if (sliderDragValue == null) {
+                    onSeekStarted()
+                }
                 sliderDragValue = newValue
+                onSeek((newValue * totalDurationValue).roundToLong())
             },
             onValueChangeFinished = {
                 sliderDragValue?.let { finalValue ->
-                    onSeek((finalValue * totalDurationValue).roundToLong())
+                    onSeekFinished((finalValue * totalDurationValue).roundToLong())
                 }
                 sliderDragValue = null
             },
@@ -1760,6 +1763,8 @@ private fun FullPlayerContentInternal(
                         totalDurationValue = totalDurationValue,
                         progressFractionValue = progressFractionValue,
                         onSeek = onSeek,
+                        onSeekStarted = onSeekStarted,
+                        onSeekFinished = onSeekFinished,
                         expansionFraction = expansionFraction,
                         isPlaying = isPlaying,
                         currentSheetState = currentSheetState,
