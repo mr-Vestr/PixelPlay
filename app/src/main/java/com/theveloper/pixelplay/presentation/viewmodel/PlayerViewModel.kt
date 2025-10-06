@@ -751,164 +751,20 @@ class PlayerViewModel @Inject constructor(
         }
 
         castSessionManagerListener = object : SessionManagerListener<CastSession> {
-            private fun transferPlayback(session: CastSession) {
-                viewModelScope.launch {
-                    if (!ensureHttpServerRunning()) {
-                        sendToast("Could not start cast server. Check connection.")
-                        disconnect()
-                        return@launch
-                    }
-
-                    val serverAddress = MediaFileHttpServerService.serverAddress ?: return@launch
-                    val localPlayer = mediaController ?: return@launch
-                    val currentQueue = _playerUiState.value.currentPlaybackQueue
-                    if (currentQueue.isEmpty()) return@launch
-
-                    val wasPlaying = localPlayer.isPlaying
-                    val currentSongIndex = localPlayer.currentMediaItemIndex
-                    val currentPosition = localPlayer.currentPosition
-
-                    localPlayer.pause()
-                    stopProgressUpdates()
-
-                    Timber.d("Preparing to cast. Server address: $serverAddress")
-                    val mediaItems = currentQueue.map { song ->
-                        val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
-                        mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, song.title)
-                        mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, song.artist)
-                        val artUrl = "$serverAddress/art/${song.id}"
-                        mediaMetadata.addImage(WebImage(artUrl.toUri()))
-                        val mediaUrl = "$serverAddress/song/${song.id}"
-                        val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(song.path)) ?: "audio/*"
-                        Timber.d("Casting song: ${song.title}, URL: $mediaUrl, MIME: $mimeType")
-                        val mediaInfo = MediaInfo.Builder(mediaUrl)
-                            .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                            .setContentType(mimeType)
-                            .setMetadata(mediaMetadata)
-                            .build()
-                        MediaQueueItem.Builder(mediaInfo).setCustomData(org.json.JSONObject().put("songId", song.id)).build()
-                    }
-
-                    val castRepeatMode = if (localPlayer.shuffleModeEnabled) {
-                        MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
-                    } else {
-                        when (localPlayer.repeatMode) {
-                            Player.REPEAT_MODE_ONE -> MediaStatus.REPEAT_MODE_REPEAT_SINGLE
-                            Player.REPEAT_MODE_ALL -> MediaStatus.REPEAT_MODE_REPEAT_ALL
-                            else -> MediaStatus.REPEAT_MODE_REPEAT_OFF
-                        }
-                    }
-
-                    session.remoteMediaClient?.queueLoad(
-                        mediaItems.toTypedArray(),
-                        currentSongIndex,
-                        castRepeatMode,
-                        currentPosition,
-                        null
-                    )?.setResultCallback {
-                        if (it.status.isSuccess) {
-                            if (wasPlaying) {
-                                session.remoteMediaClient?.play()?.setResultCallback { playResult ->
-                                    if (!playResult.status.isSuccess) {
-                                        Timber.e("Remote play command failed: ${playResult.status.statusMessage}")
-                                    }
-                                }
-                            }
-                        } else {
-                            sendToast("Failed to load media on cast device.")
-                            Timber.e("Remote media client failed to load queue: ${it.status.statusMessage}")
-                            // Fallback to local playback instead of disconnecting
-                            if (wasPlaying) {
-                                localPlayer.play()
-                                startProgressUpdates()
-                            }
-                        }
-                    }
-                    _castSession.value = session
-                    session.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
-                    session.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
-
-                    remoteProgressObserverJob?.cancel()
-                    remoteProgressObserverJob = viewModelScope.launch {
-                        _remotePosition.collect { position ->
-                            _playerUiState.update { it.copy(currentPosition = position) }
-                        }
-                    }
-                }
-            }
-
             override fun onSessionStarted(session: CastSession, sessionId: String) {
-                transferPlayback(session)
+                this@PlayerViewModel.transferPlayback(session)
             }
 
             override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
-                transferPlayback(session)
-            }
-
-            private fun stopServerAndTransferBack() {
-                val session = _castSession.value ?: return
-                val remoteMediaClient = session.remoteMediaClient ?: return
-                val lastKnownStatus = remoteMediaClient.mediaStatus
-                val lastPosition = _remotePosition.value
-                val wasPlaying = lastKnownStatus?.playerState == MediaStatus.PLAYER_STATE_PLAYING
-                val lastItemId = lastKnownStatus?.currentItemId
-                val lastRepeatMode = lastKnownStatus?.queueRepeatMode ?: Player.REPEAT_MODE_OFF
-                val isShuffleEnabled = lastRepeatMode == MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
-                remoteProgressObserverJob?.cancel()
-                remoteMediaClient.removeProgressListener(remoteProgressListener!!)
-                remoteMediaClient.unregisterCallback(remoteMediaClientCallback!!)
-                _castSession.value = null
-                context.stopService(Intent(context, MediaFileHttpServerService::class.java))
-                disconnect()
-                val localPlayer = mediaController ?: return
-                if (lastKnownStatus != null && lastItemId != null) {
-                    val songMap = _masterAllSongs.value.associateBy { it.id }
-                    val finalQueue = lastKnownStatus.queueItems.mapNotNull { item ->
-                        item.customData?.optString("songId")?.let { songId ->
-                            songMap[songId]
-                        }
-                    }
-                    if (finalQueue.isNotEmpty()) {
-                        val lastPlayedRemoteItem = lastKnownStatus.getQueueItemById(lastItemId)
-                        val lastPlayedSongId = lastPlayedRemoteItem?.customData?.optString("songId")
-                        val startIndex = finalQueue.indexOfFirst { it.id == lastPlayedSongId }.coerceAtLeast(0)
-                        val mediaItems = finalQueue.map { song ->
-                            MediaItem.Builder()
-                                .setMediaId(song.id)
-                                .setUri(song.contentUriString.toUri())
-                                .setMediaMetadata(
-                                    MediaMetadata.Builder()
-                                        .setTitle(song.title)
-                                        .setArtist(song.artist)
-                                        .setArtworkUri(song.albumArtUriString?.toUri())
-                                        .build()
-                                )
-                                .build()
-                        }
-                        localPlayer.shuffleModeEnabled = isShuffleEnabled
-                        localPlayer.repeatMode = when (lastRepeatMode) {
-                            MediaStatus.REPEAT_MODE_REPEAT_SINGLE -> Player.REPEAT_MODE_ONE
-                            MediaStatus.REPEAT_MODE_REPEAT_ALL, MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE -> Player.REPEAT_MODE_ALL
-                            else -> Player.REPEAT_MODE_OFF
-                        }
-                        localPlayer.setMediaItems(mediaItems, startIndex, lastPosition)
-                        localPlayer.prepare()
-                        if (wasPlaying) {
-                            localPlayer.play()
-                            startProgressUpdates()
-                        } else {
-                            _playerUiState.update { it.copy(currentPosition = lastPosition) }
-                        }
-                    }
-                }
+                this@PlayerViewModel.transferPlayback(session)
             }
 
             override fun onSessionEnded(session: CastSession, error: Int) {
-                stopServerAndTransferBack()
+                this@PlayerViewModel.stopServerAndTransferBack()
             }
 
             override fun onSessionSuspended(session: CastSession, reason: Int) {
-                stopServerAndTransferBack()
+                this@PlayerViewModel.stopServerAndTransferBack()
             }
 
             // Other listener methods can be overridden if needed
@@ -918,13 +774,162 @@ class PlayerViewModel @Inject constructor(
             override fun onSessionResuming(session: CastSession, sessionId: String) {}
             override fun onSessionResumeFailed(session: CastSession, error: Int) {}
         }
+    }
+
+    private fun transferPlayback(session: CastSession) {
+        viewModelScope.launch {
+            if (!ensureHttpServerRunning()) {
+                sendToast("Could not start cast server. Check connection.")
+                return@launch
+            }
+
+            val serverAddress = MediaFileHttpServerService.serverAddress ?: return@launch
+            val localPlayer = mediaController ?: return@launch
+            val currentQueue = _playerUiState.value.currentPlaybackQueue
+            if (currentQueue.isEmpty()) return@launch
+
+            val wasPlaying = localPlayer.isPlaying
+            val currentSongIndex = localPlayer.currentMediaItemIndex
+            val currentPosition = localPlayer.currentPosition
+
+            localPlayer.pause()
+            stopProgressUpdates()
+
+            Timber.d("Preparing to cast. Server address: $serverAddress")
+            val mediaItems = currentQueue.map { song ->
+                val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
+                mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, song.title)
+                mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, song.artist)
+                val artUrl = "$serverAddress/art/${song.id}"
+                mediaMetadata.addImage(WebImage(artUrl.toUri()))
+                val mediaUrl = "$serverAddress/song/${song.id}"
+                val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(song.path)) ?: "audio/*"
+                Timber.d("Casting song: ${song.title}, URL: $mediaUrl, MIME: $mimeType")
+                val mediaInfo = MediaInfo.Builder(mediaUrl)
+                    .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+                    .setContentType(mimeType)
+                    .setMetadata(mediaMetadata)
+                    .build()
+                MediaQueueItem.Builder(mediaInfo).setCustomData(org.json.JSONObject().put("songId", song.id)).build()
+            }
+
+            val castRepeatMode = if (localPlayer.shuffleModeEnabled) {
+                MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
+            } else {
+                when (localPlayer.repeatMode) {
+                    Player.REPEAT_MODE_ONE -> MediaStatus.REPEAT_MODE_REPEAT_SINGLE
+                    Player.REPEAT_MODE_ALL -> MediaStatus.REPEAT_MODE_REPEAT_ALL
+                    else -> MediaStatus.REPEAT_MODE_REPEAT_OFF
+                }
+            }
+
+            session.remoteMediaClient?.queueLoad(
+                mediaItems.toTypedArray(),
+                currentSongIndex,
+                castRepeatMode,
+                currentPosition,
+                null
+            )?.setResultCallback {
+                if (it.status.isSuccess) {
+                    if (wasPlaying) {
+                        session.remoteMediaClient?.play()?.setResultCallback { playResult ->
+                            if (!playResult.status.isSuccess) {
+                                Timber.e("Remote play command failed: ${playResult.status.statusMessage}")
+                            }
+                        }
+                    }
+                } else {
+                    sendToast("Failed to load media on cast device.")
+                    Timber.e("Remote media client failed to load queue: ${it.status.statusMessage}")
+                    // Fallback to local playback instead of disconnecting
+                    if (wasPlaying) {
+                        localPlayer.play()
+                        startProgressUpdates()
+                    }
+                }
+            }
+            _castSession.value = session
+            session.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
+            session.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
+
+            remoteProgressObserverJob?.cancel()
+            remoteProgressObserverJob = viewModelScope.launch {
+                _remotePosition.collect { position ->
+                    _playerUiState.update { it.copy(currentPosition = position) }
+                }
+            }
+        }
+    }
+
+    private fun stopServerAndTransferBack() {
+        val session = _castSession.value ?: return
+        val remoteMediaClient = session.remoteMediaClient ?: return
+
+        // 1. Capture remote state
+        val lastKnownStatus = remoteMediaClient.mediaStatus
+        val lastPosition = _remotePosition.value
+        val wasPlaying = lastKnownStatus?.playerState == MediaStatus.PLAYER_STATE_PLAYING
+        val lastItemId = lastKnownStatus?.currentItemId
+        val lastRepeatMode = lastKnownStatus?.queueRepeatMode ?: Player.REPEAT_MODE_OFF
+        val isShuffleEnabled = lastRepeatMode == MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
+
+        // 2. Restore local player state
+        val localPlayer = mediaController
+        if (localPlayer != null && lastKnownStatus != null && lastItemId != null) {
+            val songMap = _masterAllSongs.value.associateBy { it.id }
+            val finalQueue = lastKnownStatus.queueItems.mapNotNull { item ->
+                item.customData?.optString("songId")?.let { songId ->
+                    songMap[songId]
+                }
+            }
+            if (finalQueue.isNotEmpty()) {
+                val lastPlayedRemoteItem = lastKnownStatus.getQueueItemById(lastItemId)
+                val lastPlayedSongId = lastPlayedRemoteItem?.customData?.optString("songId")
+                val startIndex = finalQueue.indexOfFirst { it.id == lastPlayedSongId }.coerceAtLeast(0)
+                val mediaItems = finalQueue.map { song ->
+                    MediaItem.Builder()
+                        .setMediaId(song.id)
+                        .setUri(song.contentUriString.toUri())
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(song.title)
+                                .setArtist(song.artist)
+                                .setArtworkUri(song.albumArtUriString?.toUri())
+                                .build()
+                        )
+                        .build()
+                }
+                localPlayer.shuffleModeEnabled = isShuffleEnabled
+                localPlayer.repeatMode = when (lastRepeatMode) {
+                    MediaStatus.REPEAT_MODE_REPEAT_SINGLE -> Player.REPEAT_MODE_ONE
+                    MediaStatus.REPEAT_MODE_REPEAT_ALL, MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE -> Player.REPEAT_MODE_ALL
+                    else -> Player.REPEAT_MODE_OFF
+                }
+                localPlayer.setMediaItems(mediaItems, startIndex, lastPosition)
+                localPlayer.prepare()
+                if (wasPlaying) {
+                    localPlayer.play()
+                    startProgressUpdates()
+                } else {
+                    _playerUiState.update { it.copy(currentPosition = lastPosition) }
+                }
+            }
+        }
+
+        // 3. Clean up remote session resources AFTER restoring local state
+        remoteProgressObserverJob?.cancel()
+        remoteMediaClient.removeProgressListener(remoteProgressListener!!)
+        remoteMediaClient.unregisterCallback(remoteMediaClientCallback!!)
+        _castSession.value = null
+        context.stopService(Intent(context, MediaFileHttpServerService::class.java))
+        disconnect()
+    }
         sessionManager.addSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
         _castSession.value = sessionManager.currentCastSession
         _castSession.value?.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
         _castSession.value?.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
 
         Trace.endSection() // End PlayerViewModel.init
-    }
 
     fun onMainActivityStart() {
         Trace.beginSection("PlayerViewModel.onMainActivityStart")
