@@ -997,64 +997,107 @@ fun UnifiedPlayerSheet(
                             }
                     ) {
                         if (showPlayerContentArea) {
-                            // stablePlayerState.currentSong is already available from the top-level collection
-                            stablePlayerState.currentSong?.let { currentSongNonNull ->
-                                val miniPlayerAlpha by remember { derivedStateOf { (1f - playerContentExpansionFraction.value * 2f).coerceIn(0f, 1f) } }
-                                if (miniPlayerAlpha > 0.01f) {
-                                    CompositionLocalProvider(
-                                        LocalMaterialTheme provides (albumColorScheme ?: MaterialTheme.colorScheme)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopCenter)
-                                                .graphicsLayer { alpha = miniPlayerAlpha }
-                                        ) {
-                                            MiniPlayerContentInternal(
-                                                song = currentSongNonNull, // Use non-null version
-                                                cornerRadiusAlb = (overallSheetTopCornerRadius.value * 0.5).dp,
-                                                isPlaying = stablePlayerState.isPlaying, // from top-level stablePlayerState
-                                                onPlayPause = { playerViewModel.playPause() },
-                                                onNext = { playerViewModel.nextSong() },
-                                                modifier = Modifier.fillMaxSize()
-                                            )
+                            CompositionLocalProvider(
+                                LocalMaterialTheme provides (albumColorScheme ?: MaterialTheme.colorScheme)
+                            ) {
+                                when (playbackMode) {
+                                    PlaybackMode.LOCAL -> {
+                                        stablePlayerState.currentSong?.let { song ->
+                                            val miniPlayerAlpha by remember { derivedStateOf { (1f - playerContentExpansionFraction.value * 2f).coerceIn(0f, 1f) } }
+                                            if (miniPlayerAlpha > 0.01f) {
+                                                Box(modifier = Modifier.align(Alignment.TopCenter).graphicsLayer { alpha = miniPlayerAlpha }) {
+                                                    MiniPlayerContentInternal(
+                                                        song = song,
+                                                        cornerRadiusAlb = (overallSheetTopCornerRadius.value * 0.5).dp,
+                                                        isPlaying = stablePlayerState.isPlaying,
+                                                        onPlayPause = { playerViewModel.playPause() },
+                                                        onNext = { playerViewModel.nextSong() },
+                                                        modifier = Modifier.fillMaxSize()
+                                                    )
+                                                }
+                                            }
+                                            if (fullPlayerContentAlpha > 0f) {
+                                                Box(modifier = Modifier.graphicsLayer { alpha = fullPlayerContentAlpha; translationY = fullPlayerTranslationY }) {
+                                                    FullPlayerContentInternal(
+                                                        currentSong = song,
+                                                        currentPosition = positionToDisplay,
+                                                        currentPlaybackQueue = currentPlaybackQueue,
+                                                        currentQueueSourceName = currentQueueSourceName,
+                                                        isPlaying = stablePlayerState.isPlaying,
+                                                        isShuffleEnabled = stablePlayerState.isShuffleEnabled,
+                                                        repeatMode = stablePlayerState.repeatMode,
+                                                        isFavorite = playerViewModel.isCurrentSongFavorite.collectAsState().value,
+                                                        onPlayPause = { playerViewModel.playPause() },
+                                                        onSeek = { playerViewModel.seekTo(it) },
+                                                        onNext = { playerViewModel.nextSong() },
+                                                        onPrevious = { playerViewModel.previousSong() },
+                                                        onCollapse = { playerViewModel.collapsePlayerSheet() },
+                                                        expansionFraction = playerContentExpansionFraction.value,
+                                                        currentSheetState = currentSheetContentState,
+                                                        onShowQueueClicked = { showQueueSheet = true },
+                                                        onShowCastClicked = { showCastSheet = true },
+                                                        onShuffleToggle = { playerViewModel.toggleShuffle() },
+                                                        onRepeatToggle = { playerViewModel.cycleRepeatMode() },
+                                                        onFavoriteToggle = { playerViewModel.toggleFavorite() },
+                                                        playerViewModel = playerViewModel,
+                                                        onSeekStarted = { playerViewModel.onSeekStarted() },
+                                                        onSeekFinished = { playerViewModel.onSeekFinished(it) },
+                                                        playbackMode = playbackMode
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
-                                }
-
-                                if (fullPlayerContentAlpha > 0f) {
-                                    CompositionLocalProvider(
-                                        LocalMaterialTheme provides (albumColorScheme ?: MaterialTheme.colorScheme)
-                                    ) {
-                                        Box(modifier = Modifier.graphicsLayer {
-                                            alpha = fullPlayerContentAlpha
-                                            translationY = fullPlayerTranslationY
-                                        }) {
-                                            FullPlayerContentInternal(
-                                                currentSong = currentSongNonNull, // Use non-null version
-                                                currentPosition = positionToDisplay,
-                                                currentPlaybackQueue = currentPlaybackQueue,
-                                                currentQueueSourceName = currentQueueSourceName,
-                                                isPlaying = stablePlayerState.isPlaying,
-                                                isShuffleEnabled = stablePlayerState.isShuffleEnabled,
-                                                repeatMode = stablePlayerState.repeatMode,
-                                                isFavorite = playerViewModel.isCurrentSongFavorite.collectAsState().value,
-                                                onPlayPause = { playerViewModel.playPause() },
-                                                onSeek = { playerViewModel.seekTo(it) },
-                                                onNext = { playerViewModel.nextSong() },
-                                                onPrevious = { playerViewModel.previousSong() },
-                                                onCollapse = { playerViewModel.collapsePlayerSheet() },
-                                                expansionFraction = playerContentExpansionFraction.value,
-                                                currentSheetState = currentSheetContentState,
-                                                onShowQueueClicked = { showQueueSheet = true },
-                                                onShowCastClicked = { showCastSheet = true },
-                                                onShuffleToggle = { playerViewModel.toggleShuffle() },
-                                                onRepeatToggle = { playerViewModel.cycleRepeatMode() },
-                                                onFavoriteToggle = { playerViewModel.toggleFavorite() },
-                                                playerViewModel = playerViewModel, // Keep passing ViewModel if FullPlayerContentInternal needs other parts of it
-                                                onSeekStarted = { playerViewModel.onSeekStarted() },
-                                                onSeekFinished = { playerViewModel.onSeekFinished(it) },
-                                                playbackMode = playbackMode
-                                            )
+                                    PlaybackMode.REMOTE -> {
+                                        stablePlayerState.currentSong?.let { song ->
+                                            val miniPlayerAlpha by remember { derivedStateOf { (1f - playerContentExpansionFraction.value * 2f).coerceIn(0f, 1f) } }
+                                            if (miniPlayerAlpha > 0.01f) {
+                                                Box(modifier = Modifier.align(Alignment.TopCenter).graphicsLayer { alpha = miniPlayerAlpha }) {
+                                                    RemoteMiniPlayer(
+                                                        song = song,
+                                                        isPlaying = stablePlayerState.isPlaying,
+                                                        onPlayPause = { playerViewModel.playPause() },
+                                                        onDisconnect = { playerViewModel.disconnect() },
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        cornerRadius = (overallSheetTopCornerRadius.value * 0.5).dp
+                                                    )
+                                                }
+                                            }
+                                            if (fullPlayerContentAlpha > 0f) {
+                                                Box(modifier = Modifier.graphicsLayer { alpha = fullPlayerContentAlpha; translationY = fullPlayerTranslationY }) {
+                                                    RemoteFullPlayer(
+                                                        currentSong = song,
+                                                        currentPosition = positionToDisplay,
+                                                        totalDuration = stablePlayerState.totalDuration,
+                                                        isPlaying = stablePlayerState.isPlaying,
+                                                        isShuffleEnabled = stablePlayerState.isShuffleEnabled,
+                                                        repeatMode = stablePlayerState.repeatMode,
+                                                        isFavorite = playerViewModel.isCurrentSongFavorite.collectAsState().value,
+                                                        onPlayPause = { playerViewModel.playPause() },
+                                                        onNext = { playerViewModel.nextSong() },
+                                                        onPrevious = { playerViewModel.previousSong() },
+                                                        onSeek = { playerViewModel.seekTo(it) },
+                                                        onSeekStarted = { playerViewModel.onSeekStarted() },
+                                                        onSeekFinished = { playerViewModel.onSeekFinished(it) },
+                                                        onCollapse = { playerViewModel.collapsePlayerSheet() },
+                                                        onShowCastClicked = { showCastSheet = true },
+                                                        onShowQueueClicked = { showQueueSheet = true },
+                                                        onShuffleToggle = { playerViewModel.toggleShuffle() },
+                                                        onRepeatToggle = { playerViewModel.cycleRepeatMode() },
+                                                        onFavoriteToggle = { playerViewModel.toggleFavorite() },
+                                                        expansionFraction = playerContentExpansionFraction.value,
+                                                        queue = currentPlaybackQueue,
+                                                        onSongSelectedFromCarousel = { selectedSong ->
+                                                            playerViewModel.showAndPlaySong(
+                                                                song = selectedSong,
+                                                                contextSongs = currentPlaybackQueue,
+                                                                queueName = currentQueueSourceName
+                                                            )
+                                                        },
+                                                        playerViewModel = playerViewModel
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
