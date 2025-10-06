@@ -60,7 +60,7 @@ class MediaFileHttpServerService : Service() {
                     }
                     serverAddress = "http://$ipAddress:8080"
 
-                    server = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
+                    server = embeddedServer(Netty, port = 8080, host = ipAddress) {
                         routing {
                             get("/song/{songId}") {
                                 val songId = call.parameters["songId"]
