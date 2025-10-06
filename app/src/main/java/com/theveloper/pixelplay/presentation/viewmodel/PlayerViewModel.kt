@@ -788,28 +788,32 @@ class PlayerViewModel @Inject constructor(
             val currentQueue = _playerUiState.value.currentPlaybackQueue
             if (currentQueue.isEmpty()) return@launch
 
+            // ---> CAPTURE STATE <---
             val wasPlaying = localPlayer.isPlaying
             val currentSongIndex = localPlayer.currentMediaItemIndex
             val currentPosition = localPlayer.currentPosition
+            Log.d("CastContinuity", "Transfiriendo a Cast. Índice: $currentSongIndex, Posición: $currentPosition ms, Estaba sonando: $wasPlaying")
 
+
+            // Stop local playback AFTER capturing state
             localPlayer.pause()
             stopProgressUpdates()
 
-            Timber.d("Preparing to cast. Server address: $serverAddress")
+
             val mediaItems = currentQueue.map { song ->
                 val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
                 mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, song.title)
                 mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, song.artist)
                 val artUrl = "$serverAddress/art/${song.id}"
                 mediaMetadata.addImage(WebImage(artUrl.toUri()))
-                val mediaUrl = "$serverAddress/song/${song.id}"
-                val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(song.path)) ?: "audio/*"
-                Timber.d("Casting song: ${song.title}, URL: $mediaUrl, MIME: $mimeType")
-                val mediaInfo = MediaInfo.Builder(mediaUrl)
+
+                val songUrl = "$serverAddress/song/${song.id}"
+                val mediaInfo = MediaInfo.Builder(songUrl)
                     .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                    .setContentType(mimeType)
+                    .setContentType("audio/mpeg") // Revert to audio/mpeg for broader compatibility
                     .setMetadata(mediaMetadata)
                     .build()
+
                 MediaQueueItem.Builder(mediaInfo).setCustomData(org.json.JSONObject().put("songId", song.id)).build()
             }
 
@@ -823,11 +827,12 @@ class PlayerViewModel @Inject constructor(
                 }
             }
 
+            // ---> SEND STATE <---
             session.remoteMediaClient?.queueLoad(
                 mediaItems.toTypedArray(),
                 currentSongIndex,
                 castRepeatMode,
-                currentPosition,
+                currentPosition,   // Pass the captured position
                 null
             )?.setResultCallback {
                 if (it.status.isSuccess) {
@@ -841,13 +846,15 @@ class PlayerViewModel @Inject constructor(
                 } else {
                     sendToast("Failed to load media on cast device.")
                     Timber.e("Remote media client failed to load queue: ${it.status.statusMessage}")
-                    // Fallback to local playback instead of disconnecting
+                    // Fallback to local playback if remote load fails
                     if (wasPlaying) {
                         localPlayer.play()
                         startProgressUpdates()
                     }
                 }
             }
+
+            // Finalize session setup
             _castSession.value = session
             session.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
             session.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
@@ -867,25 +874,30 @@ class PlayerViewModel @Inject constructor(
 
         // 1. Capture remote state
         val lastKnownStatus = remoteMediaClient.mediaStatus
-        val lastPosition = _remotePosition.value
+        val lastPosition = remoteMediaClient.approximateStreamPosition
         val wasPlaying = lastKnownStatus?.playerState == MediaStatus.PLAYER_STATE_PLAYING
         val lastItemId = lastKnownStatus?.currentItemId
-        val lastRepeatMode = lastKnownStatus?.queueRepeatMode ?: Player.REPEAT_MODE_OFF
+        val lastRepeatMode = lastKnownStatus?.queueRepeatMode ?: MediaStatus.REPEAT_MODE_REPEAT_OFF
         val isShuffleEnabled = lastRepeatMode == MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
+
+        Log.d("CastContinuity", "Transferring back to local. Position: $lastPosition, Playing: $wasPlaying, Shuffle: $isShuffleEnabled, Repeat: $lastRepeatMode")
 
         // 2. Restore local player state
         val localPlayer = mediaController
         if (localPlayer != null && lastKnownStatus != null && lastItemId != null) {
             val songMap = _masterAllSongs.value.associateBy { it.id }
+            // IMPORTANT: Reconstruct queue from remote source of truth
             val finalQueue = lastKnownStatus.queueItems.mapNotNull { item ->
                 item.customData?.optString("songId")?.let { songId ->
                     songMap[songId]
                 }
             }
+
             if (finalQueue.isNotEmpty()) {
                 val lastPlayedRemoteItem = lastKnownStatus.getQueueItemById(lastItemId)
                 val lastPlayedSongId = lastPlayedRemoteItem?.customData?.optString("songId")
                 val startIndex = finalQueue.indexOfFirst { it.id == lastPlayedSongId }.coerceAtLeast(0)
+
                 val mediaItems = finalQueue.map { song ->
                     MediaItem.Builder()
                         .setMediaId(song.id)
@@ -899,20 +911,28 @@ class PlayerViewModel @Inject constructor(
                         )
                         .build()
                 }
+
+                // Restore modes BEFORE setting items
                 localPlayer.shuffleModeEnabled = isShuffleEnabled
                 localPlayer.repeatMode = when (lastRepeatMode) {
                     MediaStatus.REPEAT_MODE_REPEAT_SINGLE -> Player.REPEAT_MODE_ONE
                     MediaStatus.REPEAT_MODE_REPEAT_ALL, MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE -> Player.REPEAT_MODE_ALL
                     else -> Player.REPEAT_MODE_OFF
                 }
+
+                // Set the queue, starting index, and position
                 localPlayer.setMediaItems(mediaItems, startIndex, lastPosition)
                 localPlayer.prepare()
                 if (wasPlaying) {
                     localPlayer.play()
+                    // Crucially, restart the progress updates for the local player UI
                     startProgressUpdates()
                 } else {
+                    // If not playing, still update the UI with the last known position
                     _playerUiState.update { it.copy(currentPosition = lastPosition) }
                 }
+                // Update the view model's queue to reflect the restored state
+                _playerUiState.update { it.copy(currentPlaybackQueue = finalQueue.toImmutableList()) }
             }
         }
 
@@ -921,7 +941,9 @@ class PlayerViewModel @Inject constructor(
         remoteMediaClient.removeProgressListener(remoteProgressListener!!)
         remoteMediaClient.unregisterCallback(remoteMediaClientCallback!!)
         _castSession.value = null
+        // Stop the server only after ensuring local state is restored
         context.stopService(Intent(context, MediaFileHttpServerService::class.java))
+        // Disconnect from the Cast route
         disconnect()
     }
         sessionManager.addSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
@@ -1554,10 +1576,9 @@ class PlayerViewModel @Inject constructor(
                 val artUrl = "$serverAddress/art/${song.id}"
                 mediaMetadata.addImage(WebImage(artUrl.toUri()))
                 val mediaUrl = "$serverAddress/song/${song.id}"
-                val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(song.path)) ?: "audio/*"
                 val mediaInfo = MediaInfo.Builder(mediaUrl)
                     .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                    .setContentType(mimeType)
+                    .setContentType("audio/mpeg") // Ensure compatibility
                     .setMetadata(mediaMetadata)
                     .build()
                 MediaQueueItem.Builder(mediaInfo).setCustomData(org.json.JSONObject().put("songId", song.id)).build()

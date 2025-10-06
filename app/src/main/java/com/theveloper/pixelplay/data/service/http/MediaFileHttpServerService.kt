@@ -50,79 +50,69 @@ class MediaFileHttpServerService : Service() {
     }
 
     private fun startServer() {
-        if (server?.application?.isActive != true) {
-            serviceScope.launch {
-                try {
-                    val ipAddress = getIpAddress(applicationContext)
-                    if (ipAddress == null) {
-                        stopSelf()
-                        return@launch
-                    }
-                    serverAddress = "http://$ipAddress:8080"
-
-                    server = embeddedServer(Netty, port = 8080, host = ipAddress) {
-                        routing {
-                            get("/song/{songId}") {
-                                val songId = call.parameters["songId"]
-                                if (songId == null) {
-                                    call.respond(HttpStatusCode.BadRequest, "Song ID is missing")
-                                    return@get
-                                }
-
-                                val song = musicRepository.getSong(songId).firstOrNull()
-                                if (song == null) {
-                                    call.respond(HttpStatusCode.NotFound, "Song not found")
-                                    return@get
-                                }
-
-                                contentResolver.openInputStream(song.contentUriString.toUri())?.use { inputStream ->
-                                    val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(song.path)) ?: "audio/*"
-                                    call.respondOutputStream(contentType = ContentType.parse(mimeType)) {
-                                        inputStream.copyTo(this)
-                                    }
-                                } ?: call.respond(HttpStatusCode.InternalServerError, "Could not open song file")
-                            }
-                            get("/art/{songId}") {
-                                val songId = call.parameters["songId"]
-                                if (songId == null) {
-                                    call.respond(HttpStatusCode.BadRequest, "Song ID is missing")
-                                    return@get
-                                }
-
-                                val song = musicRepository.getSong(songId).firstOrNull()
-                                if (song?.albumArtUriString == null) {
-                                    call.respond(HttpStatusCode.NotFound, "Album art not found")
-                                    return@get
-                                }
-
-                                val artUri = song.albumArtUriString.toUri()
-                                contentResolver.openInputStream(artUri)?.use { inputStream ->
-                                    call.respondOutputStream(contentType = ContentType.Image.JPEG) {
-                                        inputStream.copyTo(this)
-                                    }
-                                } ?: call.respond(HttpStatusCode.InternalServerError, "Could not open album art file")
-                            }
-                        }
-                    }.start(wait = false)
-                    isServerRunning = true
-                } catch (e: Exception) {
+        if (server?.application?.isActive == true) {
+            return
+        }
+        serviceScope.launch {
+            try {
+                val ipAddress = getIpAddress(applicationContext)
+                if (ipAddress == null) {
                     stopSelf()
+                    return@launch
                 }
+                serverAddress = "http://$ipAddress:8080"
+                server = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
+                    routing {
+                        get("/song/{songId}") {
+                            val songId = call.parameters["songId"]
+                            if (songId == null) {
+                                call.respond(HttpStatusCode.BadRequest, "Song ID is missing")
+                                return@get
+                            }
+                            val song = musicRepository.getSong(songId).firstOrNull()
+                            if (song == null) {
+                                call.respond(HttpStatusCode.NotFound, "Song not found")
+                                return@get
+                            }
+                            contentResolver.openInputStream(song.contentUriString.toUri())?.use { inputStream ->
+                                call.respondOutputStream(contentType = ContentType.Audio.MPEG) {
+                                    inputStream.copyTo(this)
+                                }
+                            } ?: call.respond(HttpStatusCode.InternalServerError, "Could not open song file")
+                        }
+                        get("/art/{songId}") {
+                            val songId = call.parameters["songId"]
+                            if (songId == null) {
+                                call.respond(HttpStatusCode.BadRequest, "Song ID is missing")
+                                return@get
+                            }
+                            val song = musicRepository.getSong(songId).firstOrNull()
+                            if (song?.albumArtUriString == null) {
+                                call.respond(HttpStatusCode.NotFound, "Album art not found")
+                                return@get
+                            }
+                            val artUri = song.albumArtUriString.toUri()
+                            contentResolver.openInputStream(artUri)?.use { inputStream ->
+                                call.respondOutputStream(contentType = ContentType.Image.JPEG) {
+                                    inputStream.copyTo(this)
+                                }
+                            } ?: call.respond(HttpStatusCode.InternalServerError, "Could not open album art file")
+                        }
+                    }
+                }.start(wait = false)
+                isServerRunning = true
+            } catch (e: Exception) {
+                stopSelf()
             }
         }
     }
 
     private fun getIpAddress(context: Context): String? {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        for (network in connectivityManager.allNetworks) {
-            val networkCapabilities = connectivityManager.getNetworkCapabilities(network) ?: continue
-            if (networkCapabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
-                val linkProperties = connectivityManager.getLinkProperties(network) ?: continue
-                for (linkAddress in linkProperties.linkAddresses) {
-                    if (linkAddress.address is Inet4Address) {
-                        return linkAddress.address.hostAddress
-                    }
-                }
+        val linkProperties = connectivityManager.getLinkProperties(connectivityManager.activeNetwork)
+        linkProperties?.linkAddresses?.forEach { linkAddress ->
+            if (linkAddress.address is Inet4Address) {
+                return linkAddress.address.hostAddress
             }
         }
         return null
