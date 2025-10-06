@@ -771,6 +771,7 @@ class PlayerViewModel @Inject constructor(
                     localPlayer.pause()
                     stopProgressUpdates()
 
+                    Timber.d("Preparing to cast. Server address: $serverAddress")
                     val mediaItems = currentQueue.map { song ->
                         val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK)
                         mediaMetadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, song.title)
@@ -778,10 +779,11 @@ class PlayerViewModel @Inject constructor(
                         val artUrl = "$serverAddress/art/${song.id}"
                         mediaMetadata.addImage(WebImage(artUrl.toUri()))
                         val mediaUrl = "$serverAddress/song/${song.id}"
-                val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(song.path)) ?: "audio/*"
+                        val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(song.path)) ?: "audio/*"
+                        Timber.d("Casting song: ${song.title}, URL: $mediaUrl, MIME: $mimeType")
                         val mediaInfo = MediaInfo.Builder(mediaUrl)
                             .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                    .setContentType(mimeType)
+                            .setContentType(mimeType)
                             .setMetadata(mediaMetadata)
                             .build()
                         MediaQueueItem.Builder(mediaInfo).setCustomData(org.json.JSONObject().put("songId", song.id)).build()
@@ -815,7 +817,11 @@ class PlayerViewModel @Inject constructor(
                         } else {
                             sendToast("Failed to load media on cast device.")
                             Timber.e("Remote media client failed to load queue: ${it.status.statusMessage}")
-                            disconnect()
+                            // Fallback to local playback instead of disconnecting
+                            if (wasPlaying) {
+                                localPlayer.play()
+                                startProgressUpdates()
+                            }
                         }
                     }
                     _castSession.value = session
