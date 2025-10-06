@@ -280,6 +280,7 @@ class PlayerViewModel @Inject constructor(
     private var castSessionManagerListener: SessionManagerListener<CastSession>? = null
 
     private val _castSession = MutableStateFlow<CastSession?>(null)
+    val isCasting: StateFlow<Boolean> = _castSession.map { it != null }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     private val _remotePosition = MutableStateFlow(0L)
     val remotePosition: StateFlow<Long> = _remotePosition.asStateFlow()
     private val isRemotelySeeking = MutableStateFlow(false)
@@ -798,83 +799,86 @@ class PlayerViewModel @Inject constructor(
         context.registerReceiver(bluetoothStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
 
         // --- INICIO: Bloque de Cast SDK Session Management ---
+        try {
+            sessionManager = CastContext.getSharedInstance(context).sessionManager
 
-        sessionManager = CastContext.getSharedInstance(context).sessionManager
-
-        // Listener para actualizaciones de progreso desde el dispositivo de Cast
-        remoteProgressListener = RemoteMediaClient.ProgressListener { progress, _ ->
-            // Solo actualizamos la posición si el usuario no está moviendo el slider
-            if (!isRemotelySeeking.value) {
-                _remotePosition.value = progress
-            }
-        }
-
-        // Callback para cambios de estado en el reproductor remoto (cambio de canción, play/pause)
-        remoteMediaClientCallback = object : RemoteMediaClient.Callback() {
-            override fun onStatusUpdated() {
-                val remoteMediaClient = _castSession.value?.remoteMediaClient ?: return
-                val mediaStatus = remoteMediaClient.mediaStatus ?: return
-
-                // Lógica robusta para encontrar la canción actual
-                val currentItemId = mediaStatus.getCurrentItemId()
-                val currentSong = if (currentItemId == 0) null else {
-                    val currentItem = mediaStatus.getQueueItemById(currentItemId)
-                    val songId = currentItem?.media?.customData?.optString("songId")
-                    _playerUiState.value.currentPlaybackQueue.find { it.id == songId }
+            // Listener para actualizaciones de progreso desde el dispositivo de Cast
+            remoteProgressListener = RemoteMediaClient.ProgressListener { progress, _ ->
+                // Solo actualizamos la posición si el usuario no está moviendo el slider
+                if (!isRemotelySeeking.value) {
+                    _remotePosition.value = progress
                 }
+            }
 
-                // Actualiza la UI solo si la canción realmente cambió
-                if (currentSong?.id != _stablePlayerState.value.currentSong?.id) {
-                    viewModelScope.launch {
-                        currentSong?.albumArtUriString?.toUri()?.let { uri ->
-                            extractAndGenerateColorScheme(uri)
+            // Callback para cambios de estado en el reproductor remoto (cambio de canción, play/pause)
+            remoteMediaClientCallback = object : RemoteMediaClient.Callback() {
+                override fun onStatusUpdated() {
+                    val remoteMediaClient = _castSession.value?.remoteMediaClient ?: return
+                    val mediaStatus = remoteMediaClient.mediaStatus ?: return
+
+                    // Lógica robusta para encontrar la canción actual
+                    val currentItemId = mediaStatus.getCurrentItemId()
+                    val currentSong = if (currentItemId == 0) null else {
+                        val currentItem = mediaStatus.getQueueItemById(currentItemId)
+                        val songId = currentItem?.media?.customData?.optString("songId")
+                        _playerUiState.value.currentPlaybackQueue.find { it.id == songId }
+                    }
+
+                    // Actualiza la UI solo si la canción realmente cambió
+                    if (currentSong?.id != _stablePlayerState.value.currentSong?.id) {
+                        viewModelScope.launch {
+                            currentSong?.albumArtUriString?.toUri()?.let { uri ->
+                                extractAndGenerateColorScheme(uri)
+                            }
                         }
                     }
+
+                    _stablePlayerState.update {
+                        it.copy(
+                            isPlaying = mediaStatus.playerState == MediaStatus.PLAYER_STATE_PLAYING,
+                            isShuffleEnabled = mediaStatus.queueRepeatMode == MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE,
+                            repeatMode = mediaStatus.queueRepeatMode, // Mapear a Player.RepeatMode si es necesario para la UI
+                            currentSong = currentSong,
+                            totalDuration = remoteMediaClient.streamDuration
+                        )
+                    }
+                }
+            }
+
+            // Listener principal para el ciclo de vida de la sesión de Cast
+            castSessionManagerListener = object : SessionManagerListener<CastSession> {
+                override fun onSessionStarted(session: CastSession, sessionId: String) {
+                    transferPlayback(session)
                 }
 
-                _stablePlayerState.update {
-                    it.copy(
-                        isPlaying = mediaStatus.playerState == MediaStatus.PLAYER_STATE_PLAYING,
-                        isShuffleEnabled = mediaStatus.queueRepeatMode == MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE,
-                        repeatMode = mediaStatus.queueRepeatMode, // Mapear a Player.RepeatMode si es necesario para la UI
-                        currentSong = currentSong,
-                        totalDuration = remoteMediaClient.streamDuration
-                    )
+                override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
+                    transferPlayback(session)
                 }
+
+                override fun onSessionEnded(session: CastSession, error: Int) {
+                    stopServerAndTransferBack()
+                }
+
+                override fun onSessionSuspended(session: CastSession, reason: Int) {
+                    stopServerAndTransferBack()
+                }
+
+                // Métodos vacíos para el resto de eventos del ciclo de vida
+                override fun onSessionStarting(session: CastSession) {}
+                override fun onSessionStartFailed(session: CastSession, error: Int) {}
+                override fun onSessionEnding(session: CastSession) {}
+                override fun onSessionResuming(session: CastSession, sessionId: String) {}
+                override fun onSessionResumeFailed(session: CastSession, error: Int) {}
             }
+
+            sessionManager?.addSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
+            _castSession.value = sessionManager?.currentCastSession
+            _castSession.value?.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
+            _castSession.value?.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to initialize Cast SDK. Casting will be unavailable.")
+            sendToast("Casting not available on this device.")
         }
-
-        // Listener principal para el ciclo de vida de la sesión de Cast
-        castSessionManagerListener = object : SessionManagerListener<CastSession> {
-            override fun onSessionStarted(session: CastSession, sessionId: String) {
-                transferPlayback(session)
-            }
-
-            override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
-                transferPlayback(session)
-            }
-
-            override fun onSessionEnded(session: CastSession, error: Int) {
-                stopServerAndTransferBack()
-            }
-
-            override fun onSessionSuspended(session: CastSession, reason: Int) {
-                stopServerAndTransferBack()
-            }
-
-            // Métodos vacíos para el resto de eventos del ciclo de vida
-            override fun onSessionStarting(session: CastSession) {}
-            override fun onSessionStartFailed(session: CastSession, error: Int) {}
-            override fun onSessionEnding(session: CastSession) {}
-            override fun onSessionResuming(session: CastSession, sessionId: String) {}
-            override fun onSessionResumeFailed(session: CastSession, error: Int) {}
-        }
-
-        sessionManager?.addSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
-        _castSession.value = sessionManager?.currentCastSession
-        _castSession.value?.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
-        _castSession.value?.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
-
         // --- FIN: Bloque de Cast SDK Session Management ---
     }
 

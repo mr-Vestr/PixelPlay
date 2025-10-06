@@ -97,6 +97,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import com.theveloper.pixelplay.data.model.PlaybackMode
 import com.theveloper.pixelplay.presentation.viewmodel.PlayerViewModel
 // Coil imports for FullPlayerContentInternal
 
@@ -173,7 +174,7 @@ fun UnifiedPlayerSheet(
     }.collectAsState(initial = 0L)
     val remotePosition by playerViewModel.remotePosition.collectAsState()
     val selectedRoute by playerViewModel.selectedRoute.collectAsState()
-    val isCasting = selectedRoute?.isDefault == false
+    val isCasting by playerViewModel.isCasting.collectAsState()
     val positionToDisplay = if (isCasting) remotePosition else currentPosition
 
     val currentPlaybackQueue by remember {
@@ -200,6 +201,9 @@ fun UnifiedPlayerSheet(
     val undoBarVisibleDuration by remember { // Assuming this doesn't change often, mapping for consistency
         playerViewModel.playerUiState.map { it.undoBarVisibleDuration }.distinctUntilChanged()
     }.collectAsState(initial = 4000L)
+    val playbackMode by remember {
+        playerViewModel.playerUiState.map { it.playbackMode }.distinctUntilChanged()
+    }.collectAsState(initial = PlaybackMode.LOCAL)
 
     val isPlayerVisible = stablePlayerState.isPlaying
 
@@ -230,7 +234,9 @@ fun UnifiedPlayerSheet(
     val miniPlayerContentHeightPx = remember { with(density) { MiniPlayerHeight.toPx() } }
     val miniPlayerAndSpacerHeightPx = remember(density, MiniPlayerHeight) { with(density) { MiniPlayerHeight.toPx() } }
 
-    val showPlayerContentArea by remember { derivedStateOf { stablePlayerState.currentSong != null } }
+    val showPlayerContentArea by remember(stablePlayerState.currentSong, isCasting) {
+        derivedStateOf { stablePlayerState.currentSong != null || isCasting }
+    }
 
     // Use the granular showDismissUndoBar here
     val isPlayerSlotOccupied by remember(showPlayerContentArea, showDismissUndoBar) {
@@ -1044,7 +1050,10 @@ fun UnifiedPlayerSheet(
                                                 onShuffleToggle = { playerViewModel.toggleShuffle() },
                                                 onRepeatToggle = { playerViewModel.cycleRepeatMode() },
                                                 onFavoriteToggle = { playerViewModel.toggleFavorite() },
-                                                playerViewModel = playerViewModel // Keep passing ViewModel if FullPlayerContentInternal needs other parts of it
+                                                playerViewModel = playerViewModel, // Keep passing ViewModel if FullPlayerContentInternal needs other parts of it
+                                                onSeekStarted = { playerViewModel.onSeekStarted() },
+                                                onSeekFinished = { playerViewModel.onSeekFinished(it) },
+                                                playbackMode = playbackMode
                                             )
                                         }
                                     }
@@ -1427,7 +1436,10 @@ private fun FullPlayerContentInternal(
     onShuffleToggle: () -> Unit,
     onRepeatToggle: () -> Unit,
     onFavoriteToggle: () -> Unit,
-    playerViewModel: PlayerViewModel // Kept for stablePlayerState access for totalDuration, or could pass totalDuration too
+    playerViewModel: PlayerViewModel, // Kept for stablePlayerState access for totalDuration, or could pass totalDuration too
+    onSeekStarted: () -> Unit,
+    onSeekFinished: (Long) -> Unit,
+    playbackMode: PlaybackMode
 ) {
     val song = currentSong ?: return // Early exit if no song
     var showSongInfoBottomSheet by remember { mutableStateOf(false) }
@@ -1698,53 +1710,71 @@ private fun FullPlayerContentInternal(
                 // modifier for PlayerSongInfo is internal to SongMetadataDisplaySection if needed, or pass one
             )
 
-            // Progress Bar and Times - this section *will* recompose with currentPosition
-            PlayerProgressBarSection(
-                currentPosition = currentPosition, // Pass granular currentPosition
-                totalDurationValue = totalDurationValue,
-                progressFractionValue = progressFractionValue,
-                onSeek = onSeek,
-                expansionFraction = expansionFraction,
-                isPlaying = isPlaying,
-                currentSheetState = currentSheetState,
-                activeTrackColor = LocalMaterialTheme.current.primary,
-                inactiveTrackColor = LocalMaterialTheme.current.primary.copy(alpha = 0.2f),
-                thumbColor = LocalMaterialTheme.current.primary,
-                timeTextColor = LocalMaterialTheme.current.onPrimaryContainer.copy(alpha = 0.7f)
-            )
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                AnimatedPlaybackControls(
-                    modifier = Modifier
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    isPlaying = isPlaying,
-                    onPrevious = onPrevious,
-                    onPlayPause = onPlayPause,
-                    onNext = onNext,
-                    height = 80.dp,
-                    pressAnimationSpec = stableControlAnimationSpec,
-                    releaseDelay = 220L,
-                    colorOtherButtons = controlOtherButtonsColor,
-                    colorPlayPause = controlPlayPauseColor,
-                    tintPlayPauseIcon = controlTintPlayPauseIcon,
-                    tintOtherIcons = controlTintOtherIcons
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                BottomToggleRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 58.dp, max = 88.dp)
-                        .padding(horizontal = 26.dp, vertical = 8.dp),
-                    isShuffleEnabled = isShuffleEnabled,
-                    repeatMode = repeatMode,
-                    isFavorite = isFavorite,
-                    onShuffleToggle = onShuffleToggle,
-                    onRepeatToggle = onRepeatToggle,
-                    onFavoriteToggle = onFavoriteToggle
-                )
+            when (playbackMode) {
+                PlaybackMode.LOCAL -> {
+                    PlayerProgressBarSection(
+                        currentPosition = currentPosition,
+                        totalDurationValue = totalDurationValue,
+                        progressFractionValue = progressFractionValue,
+                        onSeek = onSeek,
+                        expansionFraction = expansionFraction,
+                        isPlaying = isPlaying,
+                        currentSheetState = currentSheetState,
+                        activeTrackColor = LocalMaterialTheme.current.primary,
+                        inactiveTrackColor = LocalMaterialTheme.current.primary.copy(alpha = 0.2f),
+                        thumbColor = LocalMaterialTheme.current.primary,
+                        timeTextColor = LocalMaterialTheme.current.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
+                    AnimatedPlaybackControls(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        isPlaying = isPlaying,
+                        onPrevious = onPrevious,
+                        onPlayPause = onPlayPause,
+                        onNext = onNext,
+                        height = 80.dp,
+                        pressAnimationSpec = stableControlAnimationSpec,
+                        releaseDelay = 220L,
+                        colorOtherButtons = controlOtherButtonsColor,
+                        colorPlayPause = controlPlayPauseColor,
+                        tintPlayPauseIcon = controlTintPlayPauseIcon,
+                        tintOtherIcons = controlTintOtherIcons
+                    )
+                }
+                PlaybackMode.REMOTE -> {
+                    RemotePlaybackControls(
+                        modifier = Modifier.padding(top = 16.dp),
+                        onPlayPause = onPlayPause,
+                        onNext = onNext,
+                        onPrevious = onPrevious,
+                        onSeek = onSeek,
+                        onSeekStarted = onSeekStarted,
+                        onSeekFinished = onSeekFinished,
+                        isPlaying = isPlaying,
+                        currentPosition = currentPosition,
+                        totalDuration = totalDurationValue,
+                        activeTrackColor = LocalMaterialTheme.current.primary,
+                        inactiveTrackColor = LocalMaterialTheme.current.primary.copy(alpha = 0.2f),
+                        thumbColor = LocalMaterialTheme.current.primary,
+                        timeTextColor = LocalMaterialTheme.current.onPrimaryContainer.copy(alpha = 0.7f),
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            BottomToggleRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 58.dp, max = 88.dp)
+                    .padding(horizontal = 26.dp, vertical = 8.dp),
+                isShuffleEnabled = isShuffleEnabled,
+                repeatMode = repeatMode,
+                isFavorite = isFavorite,
+                onShuffleToggle = onShuffleToggle,
+                onRepeatToggle = onRepeatToggle,
+                onFavoriteToggle = onFavoriteToggle
+            )
         }
     }
     AnimatedVisibility(
