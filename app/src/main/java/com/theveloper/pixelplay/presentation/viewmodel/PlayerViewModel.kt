@@ -274,7 +274,7 @@ class PlayerViewModel @Inject constructor(
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private val bluetoothAdapter: BluetoothAdapter?
     private var bluetoothStateReceiver: BroadcastReceiver? = null
-    private val sessionManager: SessionManager
+    private var sessionManager: SessionManager? = null
     private var castSessionManagerListener: SessionManagerListener<CastSession>? = null
 
     private val _castSession = MutableStateFlow<CastSession?>(null)
@@ -703,28 +703,33 @@ class PlayerViewModel @Inject constructor(
         }
         context.registerReceiver(bluetoothStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
 
+        // --- INICIO: Bloque de Cast SDK Session Management ---
+
         sessionManager = CastContext.getSharedInstance(context).sessionManager
 
+        // Listener para actualizaciones de progreso desde el dispositivo de Cast
         remoteProgressListener = RemoteMediaClient.ProgressListener { progress, _ ->
+            // Solo actualizamos la posición si el usuario no está moviendo el slider
             if (!isRemotelySeeking.value) {
                 _remotePosition.value = progress
             }
         }
 
+        // Callback para cambios de estado en el reproductor remoto (cambio de canción, play/pause)
         remoteMediaClientCallback = object : RemoteMediaClient.Callback() {
             override fun onStatusUpdated() {
                 val remoteMediaClient = _castSession.value?.remoteMediaClient ?: return
                 val mediaStatus = remoteMediaClient.mediaStatus ?: return
-                val songMap = _masterAllSongs.value.associateBy { it.id }
-                val newQueue = mediaStatus.queueItems.mapNotNull { item ->
-                    item.customData?.optString("songId")?.let { songId ->
-                        songMap[songId]
-                    }
-                }.toImmutableList()
+
+                // Lógica robusta para encontrar la canción actual
                 val currentItemId = mediaStatus.getCurrentItemId()
-                val currentRemoteItem = mediaStatus.getQueueItemById(currentItemId)
-                val currentSongId = currentRemoteItem?.customData?.optString("songId")
-                val currentSong = currentSongId?.let { songMap[it] }
+                val currentSong = if (currentItemId == 0) null else {
+                    val currentItem = mediaStatus.getQueueItemById(currentItemId)
+                    val songId = currentItem?.media?.customData?.optString("songId")
+                    _playerUiState.value.currentPlaybackQueue.find { it.id == songId }
+                }
+
+                // Actualiza la UI solo si la canción realmente cambió
                 if (currentSong?.id != _stablePlayerState.value.currentSong?.id) {
                     viewModelScope.launch {
                         currentSong?.albumArtUriString?.toUri()?.let { uri ->
@@ -732,14 +737,12 @@ class PlayerViewModel @Inject constructor(
                         }
                     }
                 }
-                _playerUiState.update {
-                    it.copy(currentPlaybackQueue = newQueue)
-                }
+
                 _stablePlayerState.update {
                     it.copy(
                         isPlaying = mediaStatus.playerState == MediaStatus.PLAYER_STATE_PLAYING,
                         isShuffleEnabled = mediaStatus.queueRepeatMode == MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE,
-                        repeatMode = mediaStatus.queueRepeatMode,
+                        repeatMode = mediaStatus.queueRepeatMode, // Mapear a Player.RepeatMode si es necesario para la UI
                         currentSong = currentSong,
                         totalDuration = remoteMediaClient.streamDuration
                     )
@@ -747,6 +750,7 @@ class PlayerViewModel @Inject constructor(
             }
         }
 
+        // Listener principal para el ciclo de vida de la sesión de Cast
         castSessionManagerListener = object : SessionManagerListener<CastSession> {
             override fun onSessionStarted(session: CastSession, sessionId: String) {
                 transferPlayback(session)
@@ -764,25 +768,28 @@ class PlayerViewModel @Inject constructor(
                 stopServerAndTransferBack()
             }
 
+            // Métodos vacíos para el resto de eventos del ciclo de vida
             override fun onSessionStarting(session: CastSession) {}
             override fun onSessionStartFailed(session: CastSession, error: Int) {}
             override fun onSessionEnding(session: CastSession) {}
             override fun onSessionResuming(session: CastSession, sessionId: String) {}
             override fun onSessionResumeFailed(session: CastSession, error: Int) {}
         }
-        sessionManager.addSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
-        _castSession.value = sessionManager.currentCastSession
+
+        sessionManager?.addSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
+        _castSession.value = sessionManager?.currentCastSession
         _castSession.value?.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
         _castSession.value?.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
 
-        Trace.endSection() // End PlayerViewModel.init
+        // --- FIN: Bloque de Cast SDK Session Management ---
     }
 
     private fun transferPlayback(session: CastSession) {
+        // 1. Capturar el estado del reproductor local INMEDIATAMENTE.
         val localPlayer = mediaController ?: return
         val currentQueue = _playerUiState.value.currentPlaybackQueue
         if (currentQueue.isEmpty()) {
-            Timber.w("Playback queue is empty. Cannot transfer to Cast.")
+            Timber.w("La cola de reproducción está vacía. No se puede transferir a Cast.")
             return
         }
 
@@ -790,21 +797,29 @@ class PlayerViewModel @Inject constructor(
         val currentSongIndex = localPlayer.currentMediaItemIndex
         val currentPosition = localPlayer.currentPosition
 
+        // 2. Pausar el reproductor local para dar feedback instantáneo al usuario.
         localPlayer.pause()
         stopProgressUpdates()
 
+        // 3. Iniciar la corrutina para las tareas de red.
         viewModelScope.launch {
-            Timber.d("Starting transfer to Cast. Index: $currentSongIndex, Position: $currentPosition ms, Was Playing: $wasPlaying")
+            Timber.d("Iniciando transferencia a Cast. Índice: $currentSongIndex, Posición: $currentPosition ms, Estaba sonando: $wasPlaying")
 
+            // Mostrar un indicador de carga en la UI (opcional pero recomendado)
+            // _playerUiState.update { it.copy(isConnectingToCast = true) }
+
+            // 4. Asegurar que el servidor HTTP esté activo.
             if (!ensureHttpServerRunning()) {
-                sendToast("Could not start Cast server. Check Wi-Fi connection.")
+                sendToast("No se pudo iniciar el servidor de Cast. Revisa tu conexión Wi-Fi.")
                 disconnect()
-                if (wasPlaying) localPlayer.play()
+                if (wasPlaying) localPlayer.play() // Si falla, reanuda la reproducción local.
+                // _playerUiState.update { it.copy(isConnectingToCast = false) }
                 return@launch
             }
 
             val serverAddress = MediaFileHttpServerService.serverAddress ?: return@launch
 
+            // 5. Construir la cola para el dispositivo de Cast con URLs del servidor local.
             val mediaItems = currentQueue.map { song ->
                 val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
                     putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, song.title)
@@ -819,8 +834,9 @@ class PlayerViewModel @Inject constructor(
                     .setMetadata(mediaMetadata)
                     .build()
 
+                // ¡IMPORTANTE! Guardar el ID de la canción en customData para la transición de vuelta.
                 MediaQueueItem.Builder(mediaInfo)
-                    .setCustomData(JSONObject().put("songId", song.id))
+                    .setCustomData(org.json.JSONObject().put("songId", song.id))
                     .build()
             }
 
@@ -831,26 +847,33 @@ class PlayerViewModel @Inject constructor(
                 else -> MediaStatus.REPEAT_MODE_REPEAT_OFF
             }
 
+            // 6. Enviar la cola y el estado al dispositivo remoto.
             session.remoteMediaClient?.queueLoad(
                 mediaItems.toTypedArray(),
                 currentSongIndex,
                 castRepeatMode,
-                currentPosition,
+                currentPosition, // <-- Aquí se envía el progreso exacto.
                 null
             )?.setResultCallback {
+                // Ocultar indicador de carga
+                // _playerUiState.update { it.copy(isConnectingToCast = false) }
                 if (it.status.isSuccess) {
-                    Timber.i("Queue loaded to Cast successfully.")
+                    Timber.i("Cola cargada en Cast con éxito.")
+                    // Nota: El SDK de Cast debería manejar el autoplay basado en la sesión.
+                    // Si 'wasPlaying' era true, debería empezar a sonar. Si no,
+                    // forzarlo podría ser necesario en algunos dispositivos.
                     if (wasPlaying) {
                         session.remoteMediaClient?.play()
                     }
                 } else {
-                    sendToast("Failed to load queue on Cast device.")
+                    sendToast("Fallo al cargar la lista en el dispositivo de Cast.")
                     Timber.e("Remote media client failed to load queue: ${it.status.statusMessage}")
                     disconnect()
-                    if (wasPlaying) localPlayer.play()
+                    if (wasPlaying) localPlayer.play() // Reanuda local si la carga remota falla.
                 }
             }
 
+            // 7. Registrarse para recibir actualizaciones del reproductor remoto.
             _castSession.value = session
             session.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
             session.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
@@ -870,10 +893,12 @@ class PlayerViewModel @Inject constructor(
         val session = _castSession.value ?: return
         val remoteMediaClient = session.remoteMediaClient ?: return
 
+        // 1. Capturar el último estado conocido del reproductor remoto.
         val lastKnownStatus = remoteMediaClient.mediaStatus
         val lastPosition = _remotePosition.value
         val wasPlaying = lastKnownStatus?.playerState == MediaStatus.PLAYER_STATE_PLAYING
 
+        // 2. Limpiar todos los listeners y estado de Cast.
         remoteProgressObserverJob?.cancel()
         remoteMediaClient.removeProgressListener(remoteProgressListener!!)
         remoteMediaClient.unregisterCallback(remoteMediaClientCallback!!)
@@ -885,18 +910,21 @@ class PlayerViewModel @Inject constructor(
         val lastKnownQueue = _playerUiState.value.currentPlaybackQueue.toList()
 
         if (lastKnownQueue.isNotEmpty() && lastKnownStatus != null) {
-            val lastPlayedItem = lastKnownStatus.currentItem
+            // 3. Identificar la canción correcta usando el songId guardado.
+            val currentItemId = lastKnownStatus.getCurrentItemId()
+            val lastPlayedItem = if (currentItemId == 0) null else lastKnownStatus.getQueueItemById(currentItemId)
             val lastPlayedSongId = lastPlayedItem?.media?.customData?.optString("songId")
 
             if (lastPlayedSongId == null) {
-                Timber.w("Could not get songId from Cast session. Cannot restore.")
+                Timber.w("No se pudo obtener el songId de la sesión de Cast. No se puede restaurar.")
                 return
             }
 
             val startIndex = lastKnownQueue.indexOfFirst { it.id == lastPlayedSongId }.coerceAtLeast(0)
 
-            Timber.d("Starting transfer to Local. Song ID: $lastPlayedSongId, Index: $startIndex, Position: $lastPosition ms, Was Playing: $wasPlaying")
+            Timber.d("Iniciando transferencia a Local. Canción ID: $lastPlayedSongId, Índice: $startIndex, Posición: $lastPosition ms, Estaba sonando: $wasPlaying")
 
+            // 4. Reconstruir la cola para el reproductor local.
             val mediaItems = lastKnownQueue.map { song ->
                 MediaItem.Builder()
                     .setMediaId(song.id)
@@ -911,6 +939,7 @@ class PlayerViewModel @Inject constructor(
                     .build()
             }
 
+            // 5. Restaurar el estado de shuffle y repeat.
             val lastRepeatMode = lastKnownStatus.queueRepeatMode
             localPlayer.shuffleModeEnabled = lastRepeatMode == MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
             localPlayer.repeatMode = when(lastRepeatMode) {
@@ -919,15 +948,16 @@ class PlayerViewModel @Inject constructor(
                 else -> Player.REPEAT_MODE_OFF
             }
 
+            // 6. Cargar la cola en el reproductor local, especificando el punto exacto de inicio.
             localPlayer.setMediaItems(mediaItems, startIndex, lastPosition)
             localPlayer.prepare()
 
+            // 7. Reanudar la reproducción si estaba activa.
             if (wasPlaying) {
                 localPlayer.play()
             }
         }
     }
-
 
     fun onMainActivityStart() {
         Trace.beginSection("PlayerViewModel.onMainActivityStart")
@@ -1508,7 +1538,6 @@ class PlayerViewModel @Inject constructor(
                 updateCurrentPlaybackQueueFromPlayer(mediaController)
             }
         })
-        Trace.endSection()
     }
 
     private fun createShuffledQueue(songs: List<Song>): List<Song> {
@@ -1916,7 +1945,7 @@ class PlayerViewModel @Inject constructor(
                 primary = sv.primary.toComposeColor(), onPrimary = sv.onPrimary.toComposeColor(), primaryContainer = sv.primaryContainer.toComposeColor(), onPrimaryContainer = sv.onPrimaryContainer.toComposeColor(),
                 secondary = sv.secondary.toComposeColor(), onSecondary = sv.onSecondary.toComposeColor(), secondaryContainer = sv.secondaryContainer.toComposeColor(), onSecondaryContainer = sv.onSecondaryContainer.toComposeColor(),
                 tertiary = sv.tertiary.toComposeColor(), onTertiary = sv.onTertiary.toComposeColor(), tertiaryContainer = sv.tertiaryContainer.toComposeColor(), onTertiaryContainer = sv.onTertiaryContainer.toComposeColor(),
-                background = sv.background.toComposeColor(), onBackground = sv.onBackground.toHexString(), surface = sv.surface.toComposeColor(), onSurface = sv.onSurface.toComposeColor(),
+                background = sv.background.toComposeColor(), onBackground = sv.onBackground.toComposeColor(), surface = sv.surface.toComposeColor(), onSurface = sv.onSurface.toComposeColor(),
                 surfaceVariant = sv.surfaceVariant.toComposeColor(), onSurfaceVariant = sv.onSurfaceVariant.toComposeColor(), error = sv.error.toComposeColor(), onError = sv.onError.toComposeColor(),
                 outline = sv.outline.toComposeColor(), errorContainer = sv.errorContainer.toComposeColor(), onErrorContainer = sv.onErrorContainer.toComposeColor(),
                 inversePrimary = sv.inversePrimary.toComposeColor(), surfaceTint = sv.surfaceTint.toComposeColor(), outlineVariant = sv.outlineVariant.toComposeColor(), scrim = sv.scrim.toComposeColor(),
@@ -2347,7 +2376,7 @@ class PlayerViewModel @Inject constructor(
         mediaRouter.removeCallback(mediaRouterCallback)
         networkCallback?.let { connectivityManager.unregisterNetworkCallback(it) }
         bluetoothStateReceiver?.let { context.unregisterReceiver(it) }
-        sessionManager.removeSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
+        sessionManager?.removeSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
     }
 
     // Sleep Timer Control Functions
