@@ -1457,6 +1457,7 @@ class PlayerViewModel @Inject constructor(
 
         playerCtrl.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (_castSession.value != null) return
                 _stablePlayerState.update { it.copy(isPlaying = isPlaying) }
                 if (isPlaying) {
                     _isSheetVisible.value = true
@@ -1469,6 +1470,7 @@ class PlayerViewModel @Inject constructor(
                 }
             }
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                if (_castSession.value != null) return
                 transitionSchedulerJob?.cancel()
                 transitionSchedulerJob = viewModelScope.launch {
                     if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
@@ -1515,6 +1517,7 @@ class PlayerViewModel @Inject constructor(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                if (_castSession.value != null) return
                 if (playbackState == Player.STATE_READY) {
                     _stablePlayerState.update { it.copy(totalDuration = playerCtrl.duration.coerceAtLeast(0L)) }
                 }
@@ -1524,6 +1527,7 @@ class PlayerViewModel @Inject constructor(
                 }
             }
             override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                if (_castSession.value != null) return
                 _stablePlayerState.update { it.copy(isShuffleEnabled = shuffleModeEnabled) }
                 if (playerCtrl.mediaItemCount == 0 && shuffleModeEnabled) {
                     val shuffledQueue = createShuffledQueue(_masterAllSongs.value)
@@ -1532,8 +1536,12 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
             }
-            override fun onRepeatModeChanged(repeatMode: Int) { _stablePlayerState.update { it.copy(repeatMode = repeatMode) } }
+            override fun onRepeatModeChanged(repeatMode: Int) {
+                if (_castSession.value != null) return
+                _stablePlayerState.update { it.copy(repeatMode = repeatMode) }
+            }
             override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+                if (_castSession.value != null) return
                 transitionSchedulerJob?.cancel()
                 updateCurrentPlaybackQueueFromPlayer(mediaController)
             }
