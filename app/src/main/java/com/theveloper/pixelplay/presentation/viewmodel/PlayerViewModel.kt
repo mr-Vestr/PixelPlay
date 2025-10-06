@@ -1021,7 +1021,8 @@ class PlayerViewModel @Inject constructor(
 
         if (lastKnownQueue.isNotEmpty() && lastKnownStatus != null) {
             // 3. Identificar la canción correcta usando el songId guardado.
-            val lastPlayedItem = lastKnownStatus.currentItem
+            val currentItemId = lastKnownStatus.getCurrentItemId()
+            val lastPlayedItem = if (currentItemId == 0) null else lastKnownStatus.getQueueItemById(currentItemId)
             val lastPlayedSongId = lastPlayedItem?.media?.customData?.optString("songId")
 
             if (lastPlayedSongId == null) {
