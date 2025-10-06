@@ -890,7 +890,8 @@ class PlayerViewModel @Inject constructor(
 
         if (lastKnownQueue.isNotEmpty() && lastKnownStatus != null) {
             // ---> CORRECT SONG IDENTIFICATION <---
-            val lastPlayedItem = lastKnownStatus.currentItem
+            val currentItemId = lastKnownStatus.getCurrentItemId()
+            val lastPlayedItem = lastKnownStatus.getQueueItemById(currentItemId)
             val lastPlayedSongId = lastPlayedItem?.media?.customData?.optString("songId")
 
             if (lastPlayedSongId == null) {
