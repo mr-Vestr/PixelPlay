@@ -113,10 +113,18 @@ class MediaFileHttpServerService : Service() {
 
     private fun getIpAddress(context: Context): String? {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val activeNetwork = connectivityManager.activeNetwork ?: return null
-        val linkProperties = connectivityManager.getLinkProperties(activeNetwork) ?: return null
-        val ipAddress = linkProperties.linkAddresses.find { it.address is Inet4Address }
-        return ipAddress?.address?.hostAddress
+        for (network in connectivityManager.allNetworks) {
+            val networkCapabilities = connectivityManager.getNetworkCapabilities(network) ?: continue
+            if (networkCapabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
+                val linkProperties = connectivityManager.getLinkProperties(network) ?: continue
+                for (linkAddress in linkProperties.linkAddresses) {
+                    if (linkAddress.address is Inet4Address) {
+                        return linkAddress.address.hostAddress
+                    }
+                }
+            }
+        }
+        return null
     }
 
     override fun onDestroy() {
