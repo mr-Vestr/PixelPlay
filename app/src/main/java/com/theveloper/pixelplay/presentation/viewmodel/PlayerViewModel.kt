@@ -66,6 +66,7 @@ import com.theveloper.pixelplay.data.model.Artist
 import com.theveloper.pixelplay.data.model.Genre
 import com.theveloper.pixelplay.data.model.Lyrics
 import com.theveloper.pixelplay.data.model.SearchFilterType
+import com.theveloper.pixelplay.data.model.PlaybackMode
 import com.theveloper.pixelplay.data.model.SearchHistoryItem
 import com.theveloper.pixelplay.data.model.SearchResultItem
 import com.theveloper.pixelplay.data.model.Song
@@ -162,7 +163,8 @@ data class PlayerUiState(
     val dismissedQueueName: String = "",
     val dismissedPosition: Long = 0L,
     val undoBarVisibleDuration: Long = 4000L,
-    val preparingSongId: String? = null
+    val preparingSongId: String? = null,
+    val playbackMode: PlaybackMode = PlaybackMode.LOCAL
 )
 
 sealed interface LyricsSearchUiState {
@@ -863,6 +865,7 @@ class PlayerViewModel @Inject constructor(
                 }
 
                 _castSession.value = session
+                _playerUiState.update { it.copy(playbackMode = PlaybackMode.REMOTE) }
                 session.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
                 session.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
 
@@ -894,6 +897,7 @@ class PlayerViewModel @Inject constructor(
         remoteMediaClient.removeProgressListener(remoteProgressListener!!)
         remoteMediaClient.unregisterCallback(remoteMediaClientCallback!!)
         _castSession.value = null
+        _playerUiState.update { it.copy(playbackMode = PlaybackMode.LOCAL) }
         context.stopService(Intent(context, MediaFileHttpServerService::class.java))
         disconnect()
 
