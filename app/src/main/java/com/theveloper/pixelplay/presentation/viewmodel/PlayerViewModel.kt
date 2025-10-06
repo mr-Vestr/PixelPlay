@@ -815,9 +815,12 @@ class PlayerViewModel @Inject constructor(
                 mediaMetadata.addImage(WebImage(artUrl.toUri()))
 
                 val songUrl = "$serverAddress/song/${song.id}"
+                val fileExtension = MimeTypeMap.getFileExtensionFromUrl(song.contentUriString)
+                val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(fileExtension) ?: "audio/mpeg"
+
                 val mediaInfo = MediaInfo.Builder(songUrl)
                     .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                    .setContentType("audio/mpeg") // Revert to audio/mpeg for broader compatibility
+                    .setContentType(mimeType)
                     .setMetadata(mediaMetadata)
                     .build()
 
@@ -841,8 +844,8 @@ class PlayerViewModel @Inject constructor(
                 castRepeatMode,
                 currentPosition,   // Pass the captured position
                 null
-            )?.setResultCallback {
-                if (it.status.isSuccess) {
+            )?.setResultCallback { result ->
+                if (result.status.isSuccess) {
                     if (wasPlaying) {
                         session.remoteMediaClient?.play()?.setResultCallback { playResult ->
                             if (!playResult.status.isSuccess) {
@@ -851,8 +854,10 @@ class PlayerViewModel @Inject constructor(
                         }
                     }
                 } else {
-                    sendToast("Failed to load media on cast device.")
-                    Timber.e("Remote media client failed to load queue: ${it.status.statusMessage}")
+                    val statusCode = result.status.statusCode
+                    val statusMessage = result.status.statusMessage ?: "Unknown error"
+                    Timber.e("Remote media client failed to load queue. Status Code: $statusCode, Message: $statusMessage")
+                    sendToast("Failed to load media on cast device (Error: $statusCode). Check Wi-Fi.")
                     // Fallback to local playback if remote load fails
                     if (wasPlaying) {
                         localPlayer.play()
@@ -1577,9 +1582,11 @@ class PlayerViewModel @Inject constructor(
                 val artUrl = "$serverAddress/art/${song.id}"
                 mediaMetadata.addImage(WebImage(artUrl.toUri()))
                 val mediaUrl = "$serverAddress/song/${song.id}"
+                val fileExtension = MimeTypeMap.getFileExtensionFromUrl(song.contentUriString)
+                val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(fileExtension) ?: "audio/mpeg"
                 val mediaInfo = MediaInfo.Builder(mediaUrl)
                     .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                    .setContentType("audio/mpeg") // Ensure compatibility
+                    .setContentType(mimeType)
                     .setMetadata(mediaMetadata)
                     .build()
                 MediaQueueItem.Builder(mediaInfo).setCustomData(org.json.JSONObject().put("songId", song.id)).build()

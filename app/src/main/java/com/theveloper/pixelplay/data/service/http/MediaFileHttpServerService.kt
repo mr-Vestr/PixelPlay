@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.os.IBinder
 import androidx.core.net.toUri
+import android.webkit.MimeTypeMap
 import com.theveloper.pixelplay.data.repository.MusicRepository
 import dagger.hilt.android.AndroidEntryPoint
 import io.ktor.http.ContentType
@@ -21,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.net.Inet4Address
 import javax.inject.Inject
 
@@ -51,46 +53,63 @@ class MediaFileHttpServerService : Service() {
 
     private fun startServer() {
         if (server?.application?.isActive == true) {
+            Timber.d("HTTP Server is already running at $serverAddress")
             return
         }
         serviceScope.launch {
             try {
                 val ipAddress = getIpAddress(applicationContext)
                 if (ipAddress == null) {
+                    Timber.e("Could not get a valid IP address for the server. Stopping service.")
                     stopSelf()
                     return@launch
                 }
                 serverAddress = "http://$ipAddress:8080"
+                Timber.i("Starting HTTP server at: $serverAddress")
+
                 server = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
                     routing {
                         get("/song/{songId}") {
                             val songId = call.parameters["songId"]
+                            Timber.d("Received request for song ID: $songId from ${call.request.origin.remoteHost}")
                             if (songId == null) {
                                 call.respond(HttpStatusCode.BadRequest, "Song ID is missing")
                                 return@get
                             }
+
                             val song = musicRepository.getSong(songId).firstOrNull()
                             if (song == null) {
+                                Timber.w("Song with ID $songId not found in repository.")
                                 call.respond(HttpStatusCode.NotFound, "Song not found")
                                 return@get
                             }
-                            contentResolver.openInputStream(song.contentUriString.toUri())?.use { inputStream ->
-                                call.respondOutputStream(contentType = ContentType.Audio.MPEG) {
+
+                            val songUri = song.contentUriString.toUri()
+                            val fileExtension = MimeTypeMap.getFileExtensionFromUrl(songUri.toString())
+                            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(fileExtension) ?: "audio/mpeg"
+                            Timber.d("Serving song '${song.title}' with MIME type: $mimeType")
+
+                            contentResolver.openInputStream(songUri)?.use { inputStream ->
+                                call.respondOutputStream(contentType = ContentType.parse(mimeType)) {
                                     inputStream.copyTo(this)
                                 }
                             } ?: call.respond(HttpStatusCode.InternalServerError, "Could not open song file")
                         }
                         get("/art/{songId}") {
                             val songId = call.parameters["songId"]
+                            Timber.d("Received request for album art ID: $songId from ${call.request.origin.remoteHost}")
                             if (songId == null) {
                                 call.respond(HttpStatusCode.BadRequest, "Song ID is missing")
                                 return@get
                             }
+
                             val song = musicRepository.getSong(songId).firstOrNull()
                             if (song?.albumArtUriString == null) {
+                                Timber.w("Album art for song ID $songId not found.")
                                 call.respond(HttpStatusCode.NotFound, "Album art not found")
                                 return@get
                             }
+
                             val artUri = song.albumArtUriString.toUri()
                             contentResolver.openInputStream(artUri)?.use { inputStream ->
                                 call.respondOutputStream(contentType = ContentType.Image.JPEG) {
@@ -101,7 +120,11 @@ class MediaFileHttpServerService : Service() {
                     }
                 }.start(wait = false)
                 isServerRunning = true
+                Timber.i("HTTP Server started successfully.")
             } catch (e: Exception) {
+                Timber.e(e, "Failed to start HTTP server.")
+                isServerRunning = false
+                serverAddress = null
                 stopSelf()
             }
         }
