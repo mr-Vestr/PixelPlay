@@ -525,6 +525,7 @@ class PlayerViewModel @Inject constructor(
     private var progressJob: Job? = null
     private var remoteProgressObserverJob: Job? = null
     private var transitionSchedulerJob: Job? = null
+    private var isTransferringToRemote = false
 
     private fun incrementSongScore(songId: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -785,11 +786,12 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun transferPlayback(session: CastSession) {
-        // 1. Capturar el estado del reproductor local INMEDIATAMENTE.
+        isTransferringToRemote = true // Set flag immediately
         val localPlayer = mediaController ?: return
         val currentQueue = _playerUiState.value.currentPlaybackQueue
         if (currentQueue.isEmpty()) {
-            Timber.w("La cola de reproducción está vacía. No se puede transferir a Cast.")
+            Timber.w("Queue is empty. Cannot transfer to Cast.")
+            isTransferringToRemote = false
             return
         }
 
@@ -797,94 +799,79 @@ class PlayerViewModel @Inject constructor(
         val currentSongIndex = localPlayer.currentMediaItemIndex
         val currentPosition = localPlayer.currentPosition
 
-        // 2. Pausar el reproductor local para dar feedback instantáneo al usuario.
         localPlayer.pause()
         stopProgressUpdates()
 
-        // 3. Iniciar la corrutina para las tareas de red.
         viewModelScope.launch {
-            Timber.d("Iniciando transferencia a Cast. Índice: $currentSongIndex, Posición: $currentPosition ms, Estaba sonando: $wasPlaying")
-
-            // Mostrar un indicador de carga en la UI (opcional pero recomendado)
-            // _playerUiState.update { it.copy(isConnectingToCast = true) }
-
-            // 4. Asegurar que el servidor HTTP esté activo.
-            if (!ensureHttpServerRunning()) {
-                sendToast("No se pudo iniciar el servidor de Cast. Revisa tu conexión Wi-Fi.")
-                disconnect()
-                if (wasPlaying) localPlayer.play() // Si falla, reanuda la reproducción local.
-                // _playerUiState.update { it.copy(isConnectingToCast = false) }
-                return@launch
-            }
-
-            val serverAddress = MediaFileHttpServerService.serverAddress ?: return@launch
-
-            // 5. Construir la cola para el dispositivo de Cast con URLs del servidor local.
-            val mediaItems = currentQueue.map { song ->
-                val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
-                    putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, song.title)
-                    putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, song.artist)
-                    val artUrl = "$serverAddress/art/${song.id}"
-                    addImage(WebImage(artUrl.toUri()))
-                }
-                val mediaUrl = "$serverAddress/song/${song.id}"
-                val mediaInfo = MediaInfo.Builder(mediaUrl)
-                    .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                    .setContentType("audio/mpeg")
-                    .setMetadata(mediaMetadata)
-                    .build()
-
-                // ¡IMPORTANTE! Guardar el ID de la canción en customData para la transición de vuelta.
-                MediaQueueItem.Builder(mediaInfo)
-                    .setCustomData(org.json.JSONObject().put("songId", song.id))
-                    .build()
-            }
-
-            val castRepeatMode = when {
-                localPlayer.shuffleModeEnabled -> MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
-                localPlayer.repeatMode == Player.REPEAT_MODE_ONE -> MediaStatus.REPEAT_MODE_REPEAT_SINGLE
-                localPlayer.repeatMode == Player.REPEAT_MODE_ALL -> MediaStatus.REPEAT_MODE_REPEAT_ALL
-                else -> MediaStatus.REPEAT_MODE_REPEAT_OFF
-            }
-
-            // 6. Enviar la cola y el estado al dispositivo remoto.
-            session.remoteMediaClient?.queueLoad(
-                mediaItems.toTypedArray(),
-                currentSongIndex,
-                castRepeatMode,
-                currentPosition, // <-- Aquí se envía el progreso exacto.
-                null
-            )?.setResultCallback {
-                // Ocultar indicador de carga
-                // _playerUiState.update { it.copy(isConnectingToCast = false) }
-                if (it.status.isSuccess) {
-                    Timber.i("Cola cargada en Cast con éxito.")
-                    // Nota: El SDK de Cast debería manejar el autoplay basado en la sesión.
-                    // Si 'wasPlaying' era true, debería empezar a sonar. Si no,
-                    // forzarlo podría ser necesario en algunos dispositivos.
-                    if (wasPlaying) {
-                        session.remoteMediaClient?.play()
-                    }
-                } else {
-                    sendToast("Fallo al cargar la lista en el dispositivo de Cast.")
-                    Timber.e("Remote media client failed to load queue: ${it.status.statusMessage}")
+            try {
+                Timber.d("Starting Cast transfer. Index: $currentSongIndex, Position: $currentPosition ms, WasPlaying: $wasPlaying")
+                if (!ensureHttpServerRunning()) {
+                    sendToast("Could not start Cast server. Check Wi-Fi connection.")
                     disconnect()
-                    if (wasPlaying) localPlayer.play() // Reanuda local si la carga remota falla.
+                    if (wasPlaying) localPlayer.play()
+                    return@launch
                 }
-            }
 
-            // 7. Registrarse para recibir actualizaciones del reproductor remoto.
-            _castSession.value = session
-            session.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
-            session.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
+                val serverAddress = MediaFileHttpServerService.serverAddress ?: return@launch
 
-            remoteProgressObserverJob?.cancel()
-            remoteProgressObserverJob = viewModelScope.launch {
-                _remotePosition.collect { position ->
-                    if (!isRemotelySeeking.value) {
-                        _playerUiState.update { it.copy(currentPosition = position) }
+                val mediaItems = currentQueue.map { song ->
+                    val mediaMetadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
+                        putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, song.title)
+                        putString(com.google.android.gms.cast.MediaMetadata.KEY_ARTIST, song.artist)
+                        val artUrl = "$serverAddress/art/${song.id}"
+                        addImage(WebImage(artUrl.toUri()))
+                    }
+                    val mediaUrl = "$serverAddress/song/${song.id}"
+                    val mediaInfo = MediaInfo.Builder(mediaUrl)
+                        .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+                        .setMetadata(mediaMetadata)
+                        .build()
+                    MediaQueueItem.Builder(mediaInfo)
+                        .setCustomData(JSONObject().put("songId", song.id))
+                        .build()
+                }
+
+                val castRepeatMode = when {
+                    localPlayer.shuffleModeEnabled -> MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
+                    localPlayer.repeatMode == Player.REPEAT_MODE_ONE -> MediaStatus.REPEAT_MODE_REPEAT_SINGLE
+                    localPlayer.repeatMode == Player.REPEAT_MODE_ALL -> MediaStatus.REPEAT_MODE_REPEAT_ALL
+                    else -> MediaStatus.REPEAT_MODE_REPEAT_OFF
+                }
+
+                session.remoteMediaClient?.queueLoad(
+                    mediaItems.toTypedArray(),
+                    currentSongIndex,
+                    castRepeatMode,
+                    currentPosition,
+                    null
+                )?.setResultCallback {
+                    if (it.status.isSuccess) {
+                        Timber.i("Queue loaded on Cast device successfully.")
+                        if (wasPlaying) {
+                            session.remoteMediaClient?.play()
+                        }
+                    } else {
+                        sendToast("Failed to load queue on Cast device.")
+                        Timber.e("Remote media client failed to load queue: ${it.status.statusMessage}")
+                        disconnect()
+                        if (wasPlaying) localPlayer.play()
                     }
                 }
+
+                _castSession.value = session
+                session.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
+                session.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
+
+                remoteProgressObserverJob?.cancel()
+                remoteProgressObserverJob = viewModelScope.launch {
+                    _remotePosition.collect { position ->
+                        if (!isRemotelySeeking.value) {
+                            _playerUiState.update { it.copy(currentPosition = position) }
+                        }
+                    }
+                }
+            } finally {
+                isTransferringToRemote = false // Clear flag when coroutine completes
             }
         }
     }
@@ -1457,7 +1444,7 @@ class PlayerViewModel @Inject constructor(
 
         playerCtrl.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (_castSession.value != null) return
+                if (_castSession.value != null || isTransferringToRemote) return
                 _stablePlayerState.update { it.copy(isPlaying = isPlaying) }
                 if (isPlaying) {
                     _isSheetVisible.value = true
@@ -1517,7 +1504,7 @@ class PlayerViewModel @Inject constructor(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (_castSession.value != null) return
+                if (_castSession.value != null || isTransferringToRemote) return
                 if (playbackState == Player.STATE_READY) {
                     _stablePlayerState.update { it.copy(totalDuration = playerCtrl.duration.coerceAtLeast(0L)) }
                 }
@@ -1591,7 +1578,6 @@ class PlayerViewModel @Inject constructor(
                 val mediaUrl = "$serverAddress/song/${song.id}"
                 val mediaInfo = MediaInfo.Builder(mediaUrl)
                     .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                    .setContentType("audio/mpeg")
                     .setMetadata(mediaMetadata)
                     .build()
                 MediaQueueItem.Builder(mediaInfo).setCustomData(org.json.JSONObject().put("songId", song.id)).build()
