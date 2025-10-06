@@ -838,6 +838,9 @@ class PlayerViewModel @Inject constructor(
                     else -> MediaStatus.REPEAT_MODE_REPEAT_OFF
                 }
 
+                sendToast("Server Address: $serverAddress")
+                sendToast("First Media URL: ${mediaItems.firstOrNull()?.media?.contentId}")
+
                 session.remoteMediaClient?.queueLoad(
                     mediaItems.toTypedArray(),
                     currentSongIndex,
@@ -851,8 +854,9 @@ class PlayerViewModel @Inject constructor(
                             session.remoteMediaClient?.play()
                         }
                     } else {
-                        sendToast("Failed to load queue on Cast device.")
-                        Timber.e("Remote media client failed to load queue: ${it.status.statusMessage}")
+                        val error = "Cast Error: ${it.status.statusCode} - ${it.status.statusMessage}"
+                        sendToast(error)
+                        Timber.e("Remote media client failed to load queue: $error")
                         disconnect()
                         if (wasPlaying) localPlayer.play()
                     }
