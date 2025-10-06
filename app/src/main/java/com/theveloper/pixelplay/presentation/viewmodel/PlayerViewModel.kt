@@ -565,6 +565,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     init {
+        Trace.beginSection("PlayerViewModel.init")
         Log.i("PlayerViewModel", "init started.")
 
         // Load initial sort options ONCE at startup.
@@ -774,6 +775,12 @@ class PlayerViewModel @Inject constructor(
             override fun onSessionResuming(session: CastSession, sessionId: String) {}
             override fun onSessionResumeFailed(session: CastSession, error: Int) {}
         }
+        sessionManager.addSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
+        _castSession.value = sessionManager.currentCastSession
+        _castSession.value?.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
+        _castSession.value?.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
+
+        Trace.endSection() // End PlayerViewModel.init
     }
 
     private fun transferPlayback(session: CastSession) {
@@ -946,12 +953,6 @@ class PlayerViewModel @Inject constructor(
         // Disconnect from the Cast route
         disconnect()
     }
-        sessionManager.addSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
-        _castSession.value = sessionManager.currentCastSession
-        _castSession.value?.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
-        _castSession.value?.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
-
-        Trace.endSection() // End PlayerViewModel.init
 
     fun onMainActivityStart() {
         Trace.beginSection("PlayerViewModel.onMainActivityStart")
