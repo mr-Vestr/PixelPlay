@@ -793,11 +793,11 @@ class PlayerViewModel @Inject constructor(
                 val remoteItem = lastStatus.getQueueItemById(currentItemId)
                 val songId = remoteItem?.customData?.optString("songId")
 
-                val startIndex = if (songId != null) {
+                val startIndex = (if (songId != null) {
                     lastQueue.indexOfFirst { it.id == songId }
                 } else {
-                    lastStatus.getCurrentItemIndex()
-                }.coerceAtLeast(0)
+                    lastStatus.getIndexByItemId(lastStatus.getCurrentItemId())
+                }) ?: 0
 
                 // Restore queue
                 val mediaItems = lastQueue.map { song ->
@@ -839,7 +839,7 @@ class PlayerViewModel @Inject constructor(
         remoteMediaClientCallback = object : RemoteMediaClient.Callback() {
             override fun onStatusUpdated() {
                 val status = remoteMediaClient.mediaStatus ?: return
-                val currentItem = status.getCurrentItem()
+                val currentItem = status.getQueueItemById(status.getCurrentItemId())
                 val songId = currentItem?.customData?.optString("songId")
                 val song = _masterAllSongs.value.find { it.id == songId }
 
@@ -853,11 +853,17 @@ class PlayerViewModel @Inject constructor(
                     )
                 }
                 // Update queue from remote source of truth
-                val remoteQueue = status.queueItems.mapNotNull { item ->
-                    val id = item.customData?.optString("songId")
-                    _masterAllSongs.value.find { it.id == id }
+                val remoteQueue = (0 until status.getQueueItemCount()).mapNotNull { i ->
+                    status.getQueueItem(i)
                 }
-                _playerUiState.update { it.copy(currentPlaybackQueue = remoteQueue.toImmutableList()) }
+                _playerUiState.update { state ->
+                    state.copy(
+                        currentPlaybackQueue = remoteQueue.mapNotNull { item ->
+                            val id = item.customData?.optString("songId")
+                            _masterAllSongs.value.find { it.id == id }
+                        }.toImmutableList()
+                    )
+                }
             }
         }
         remoteMediaClient.registerCallback(remoteMediaClientCallback!!)
@@ -1185,7 +1191,10 @@ class PlayerViewModel @Inject constructor(
 
         if (castPlayer != null) {
             val remoteMediaClient = castPlayer!!.remoteMediaClient
-            val itemInQueue = remoteMediaClient?.mediaQueue?.queueItems?.find { it.customData?.optString("songId") == song.id }
+            val itemInQueue = remoteMediaClient?.getMediaStatus()?.let { status ->
+                (0 until status.getQueueItemCount()).mapNotNull { i -> status.getQueueItem(i) }
+                    .find { it.customData?.optString("songId") == song.id }
+            }
 
             if (itemInQueue != null) {
                 // Song is already in the remote queue, just jump to it and play.
