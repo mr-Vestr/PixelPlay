@@ -191,15 +191,31 @@ fun RoundedHorizontalMultiBrowseCarousel(
                     mediumCounts = intArrayOf(0),
                     smallCounts = intArrayOf(1)
                 )
-                CarouselStyle.TWO_PEEK -> multiBrowseKeylineList(
-                    density = density,
-                    carouselMainAxisSize = carouselWidthPx,
-                    preferredItemSize = carouselWidthPx * 0.8f,
-                    itemSpacing = spacingPx,
-                    itemCount = itemCount,
-                    smallCounts = intArrayOf(2),
-                    alignment = CarouselAlignment.Center
-                )
+                CarouselStyle.TWO_PEEK -> {
+                    if (state.pagerState.currentPage == 0) {
+                        multiBrowseKeylineList(
+                            density = density,
+                            carouselMainAxisSize = carouselWidthPx,
+                            preferredItemSize = carouselWidthPx * 0.8f,
+                            itemSpacing = spacingPx,
+                            itemCount = itemCount,
+                            alignment = CarouselAlignment.Start,
+                            largeCounts = intArrayOf(1),
+                            mediumCounts = intArrayOf(0),
+                            smallCounts = intArrayOf(1)
+                        )
+                    } else {
+                        multiBrowseKeylineList(
+                            density = density,
+                            carouselMainAxisSize = carouselWidthPx,
+                            preferredItemSize = carouselWidthPx * 0.8f,
+                            itemSpacing = spacingPx,
+                            itemCount = itemCount,
+                            smallCounts = intArrayOf(2),
+                            alignment = CarouselAlignment.Center
+                        )
+                    }
+                }
                 else -> multiBrowseKeylineList( // Default to one peek
                     density = density,
                     carouselMainAxisSize = carouselWidthPx,
@@ -441,12 +457,13 @@ private fun Modifier.carouselItem(
     carouselStyle: String,
 ): Modifier = composed {
     val animatedAlpha by animateFloatAsState(
-        targetValue = when(carouselStyle) {
+        targetValue = when (carouselStyle) {
             CarouselStyle.ONE_PEEK -> if (index > state.pagerState.currentPage + 1) 0f else 1f
             CarouselStyle.TWO_PEEK -> if (index < state.pagerState.currentPage - 1 || index > state.pagerState.currentPage + 1) 0f else 1f
             else -> 1f
         },
-        animationSpec = tween(durationMillis = 200), label = ""
+        animationSpec = tween(durationMillis = 200),
+        label = "AlphaAnimation"
     )
 
     layout { measurable, constraints ->
