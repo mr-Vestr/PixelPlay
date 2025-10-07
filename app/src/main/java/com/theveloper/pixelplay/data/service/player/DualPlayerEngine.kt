@@ -2,55 +2,163 @@ package com.theveloper.pixelplay.data.service.player
 
 import android.content.Context
 import androidx.annotation.OptIn
+import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
-//import androidx.media3.exoplayer.ffmpeg.FfmpegAudioRenderer
-import com.theveloper.pixelplay.data.model.TransitionSettings
-import com.theveloper.pixelplay.utils.envelope
+import com.theveloper.pixelplay.data.model.Song
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Manages two ExoPlayer instances (A and B) to enable seamless transitions.
- *
- * Player A is the designated "master" player, which is exposed to the MediaSession.
- * Player B is the auxiliary player used to pre-buffer and fade in the next track.
- * After a transition, Player A adopts the state of Player B, ensuring continuity.
- */
 @OptIn(UnstableApi::class)
+@Singleton
 class DualPlayerEngine @Inject constructor(
     @ApplicationContext private val context: Context,
-) {
+) : Playback {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private var transitionJob: Job? = null
+    private var progressJob: Job? = null
 
-    private val playerA: ExoPlayer
-    private val playerB: ExoPlayer
+    private val exoPlayer: ExoPlayer
+    private var allSongs: List<Song> = emptyList()
 
-    /** The master player instance that should be connected to the MediaSession. */
-    val masterPlayer: Player
-        get() = playerA
+    override val isInitialized: Boolean = true
+    override val isPlaying: Boolean
+        get() = exoPlayer.isPlaying
+    override val audioSessionId: Int
+        get() = exoPlayer.audioSessionId
+    override val currentSong: Song?
+        get() = exoPlayer.currentMediaItem?.mediaId?.let { findSongById(it) }
+    override val currentQueue: List<Song>
+        get() = allSongs
+    override var callbacks: Playback.PlaybackCallbacks? = null
 
     init {
-        playerA = buildPlayer()
-        playerB = buildPlayer()
+        exoPlayer = buildPlayer()
+        exoPlayer.addListener(PlayerListener())
+    }
+
+    private inner class PlayerListener : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            callbacks?.onPlaybackStatusChanged(playbackState)
+            if (playbackState == Player.STATE_ENDED) {
+                callbacks?.onCompletion()
+            }
+            if (playbackState == Player.STATE_READY) {
+                callbacks?.onDurationChanged(exoPlayer.duration.coerceAtLeast(0L))
+            }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            callbacks?.onPlaybackStatusChanged(Player.STATE_IDLE)
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            callbacks?.onIsPlayingChanged(isPlaying)
+            if (isPlaying) {
+                startProgressUpdates()
+            } else {
+                stopProgressUpdates()
+            }
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val song = mediaItem?.mediaId?.let { findSongById(it) }
+            callbacks?.onSongChanged(song)
+        }
+
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            callbacks?.onShuffleModeChanged(shuffleModeEnabled)
+        }
+
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            callbacks?.onRepeatModeChanged(repeatMode)
+        }
+
+        override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+            val newQueue = mutableListOf<Song>()
+            for (i in 0 until timeline.windowCount) {
+                val mediaItem = exoPlayer.getMediaItemAt(i)
+                findSongById(mediaItem.mediaId)?.let { newQueue.add(it) }
+            }
+            callbacks?.onQueueChanged(newQueue)
+        }
+    }
+
+    override fun playSongs(songs: List<Song>, startSong: Song) {
+        this.allSongs = songs
+        val mediaItems = songs.map { it.toMediaItem() }
+        val startIndex = songs.indexOf(startSong).coerceAtLeast(0)
+
+        exoPlayer.setMediaItems(mediaItems, startIndex, 0L)
+        exoPlayer.prepare()
+        exoPlayer.play()
+    }
+
+    override fun start(): Boolean {
+        exoPlayer.play()
+        return true
+    }
+
+    override fun stop() {
+        exoPlayer.stop()
+    }
+
+    override fun pause(): Boolean {
+        exoPlayer.pause()
+        return true
+    }
+
+    override fun duration(): Int = exoPlayer.duration.takeIf { it != C.TIME_UNSET }?.toInt() ?: 0
+
+    override fun position(): Int = exoPlayer.currentPosition.toInt()
+
+    override fun seek(whereto: Int, force: Boolean): Int {
+        exoPlayer.seekTo(whereto.toLong())
+        return whereto
+    }
+
+    override fun next() {
+        if (exoPlayer.hasNextMediaItem()) {
+            exoPlayer.seekToNextMediaItem()
+        }
+    }
+
+    override fun previous() {
+        if (exoPlayer.hasPreviousMediaItem()) {
+            exoPlayer.seekToPreviousMediaItem()
+        }
+    }
+
+    override fun toggleShuffle() {
+        exoPlayer.shuffleModeEnabled = !exoPlayer.shuffleModeEnabled
+    }
+
+    override fun cycleRepeatMode() {
+        exoPlayer.repeatMode = when (exoPlayer.repeatMode) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
+            Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ALL
+            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_OFF
+            else -> Player.REPEAT_MODE_OFF
+        }
     }
 
     private fun buildPlayer(): ExoPlayer {
         val renderersFactory = DefaultRenderersFactory(context)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_renderer_mode_on)
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -63,126 +171,41 @@ class DualPlayerEngine @Inject constructor(
         }
     }
 
-    /**
-     * Prepares the auxiliary player (Player B) with the next media item.
-     */
-    fun prepareNext(mediaItem: MediaItem) {
-        playerB.stop()
-        playerB.clearMediaItems()
-        playerB.setMediaItem(mediaItem)
-        playerB.prepare()
-    }
-
-    /**
-     * If a track was pre-buffered in Player B, this cancels it.
-     */
-    fun cancelNext() {
-        if (playerB.mediaItemCount > 0) {
-            playerB.stop()
-            playerB.clearMediaItems()
-        }
-    }
-
-    /**
-     * Executes a transition based on the provided settings.
-     */
-    fun performTransition(settings: TransitionSettings) {
-        transitionJob?.cancel()
-        transitionJob = scope.launch {
-            when (settings.mode) {
-                com.theveloper.pixelplay.data.model.TransitionMode.FADE_IN_OUT -> performFadeInOutTransition(settings)
-                com.theveloper.pixelplay.data.model.TransitionMode.OVERLAP, com.theveloper.pixelplay.data.model.TransitionMode.SMOOTH -> performOverlapTransition(settings)
-                com.theveloper.pixelplay.data.model.TransitionMode.NONE -> {
-                    // No transition logic needed, the default player behavior should suffice.
-                }
+    private fun startProgressUpdates() {
+        stopProgressUpdates()
+        progressJob = scope.launch {
+            while (isActive) {
+                callbacks?.onPositionChanged(exoPlayer.currentPosition)
+                delay(1000)
             }
         }
     }
 
-    private suspend fun performFadeInOutTransition(settings: TransitionSettings) {
-        if (playerB.mediaItemCount == 0) return
-        val halfDuration = settings.durationMs.toLong() / 2
-        if (halfDuration <= 0) return
-
-        // 1. Fade Out Player A
-        var elapsed = 0L
-        while (elapsed < halfDuration) {
-            val progress = elapsed.toFloat() / halfDuration
-            playerA.volume = 1f - envelope(progress, settings.curveOut)
-            delay(50L)
-            elapsed += 50L
-        }
-        playerA.volume = 0f
-        playerA.stop()
-
-        // 2. Start Player B (already prepared) and fade it in.
-        playerB.volume = 0f
-        playerB.play()
-        elapsed = 0L
-        while (elapsed < halfDuration) {
-            val progress = elapsed.toFloat() / halfDuration
-            playerB.volume = envelope(progress, settings.curveIn)
-            delay(50L)
-            elapsed += 50L
-        }
-        playerB.volume = 1f
-
-        // 3. Handover to Player A.
-        // Player A is the master player and its timeline is managed by the MediaController.
-        // We just need to tell it to move to the next item and sync its state with Player B.
-        if (playerA.hasNextMediaItem()) {
-            playerA.seekToNextMediaItem()
-            playerA.seekTo(playerB.currentPosition)
-            playerA.volume = 1f
-            playerA.play()
-        }
-
-        // 4. Clean up Player B
-        playerB.stop()
-        playerB.clearMediaItems()
+    private fun stopProgressUpdates() {
+        progressJob?.cancel()
+        progressJob = null
     }
 
-    private suspend fun performOverlapTransition(settings: TransitionSettings) {
-        if (playerB.mediaItemCount == 0) return
-
-        // 1. Start Player B and ramp volumes
-        playerB.volume = 0f
-        playerB.play()
-
-        val duration = settings.durationMs.toLong()
-        var elapsed = 0L
-        while (elapsed < duration) {
-            val progress = elapsed.toFloat() / duration
-            playerA.volume = 1f - envelope(progress, settings.curveOut)
-            playerB.volume = envelope(progress, settings.curveIn)
-            delay(50L)
-            elapsed += 50L
-        }
-        playerA.volume = 0f
-        playerB.volume = 1f
-
-        // 2. Stop Player A after fade-out is complete
-        playerA.stop()
-
-        // 3. Handover to Player A.
-        if (playerA.hasNextMediaItem()) {
-            playerA.seekToNextMediaItem()
-            playerA.seekTo(playerB.currentPosition)
-            playerA.volume = 1f
-            playerA.play()
-        }
-
-        // 4. Clean up Player B
-        playerB.stop()
-        playerB.clearMediaItems()
+    override fun release() {
+        stopProgressUpdates()
+        exoPlayer.release()
     }
 
-    /**
-     * Cleans up resources when the engine is no longer needed.
-     */
-    fun release() {
-        transitionJob?.cancel()
-        playerA.release()
-        playerB.release()
+    private fun findSongById(id: String): Song? {
+        return allSongs.find { it.id == id }
     }
+}
+
+private fun Song.toMediaItem(): MediaItem {
+    val metadata = MediaMetadata.Builder()
+        .setTitle(title)
+        .setArtist(artist)
+        .setArtworkUri(albumArtUriString?.toUri())
+        .build()
+
+    return MediaItem.Builder()
+        .setMediaId(id)
+        .setUri(contentUriString.toUri())
+        .setMediaMetadata(metadata)
+        .build()
 }
