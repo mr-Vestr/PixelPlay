@@ -872,7 +872,7 @@ class PlayerViewModel @Inject constructor(
                 override fun onSessionResumeFailed(session: CastSession, error: Int) {}
             }
 
-            sessionManager?.addSessionManagerListener(castSessionManagerListener, CastSession::class.java)
+            sessionManager?.addSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
             _castSession.value = sessionManager?.currentCastSession
             _castSession.value?.remoteMediaClient?.registerCallback(remoteMediaClientCallback!!)
             _castSession.value?.remoteMediaClient?.addProgressListener(remoteProgressListener!!, 1000)
@@ -2028,7 +2028,7 @@ class PlayerViewModel @Inject constructor(
                     if (!it.status.isSuccess) Timber.e("Remote media client failed to pause: ${it.status.statusMessage}")
                 }
             } else {
-                if (remoteMediaClient.mediaQueue != null && remoteMediaClient.mediaQueue.itemCount > 0) {
+                if (remoteMediaClient.mediaQueue.itemCount > 0) {
                     remoteMediaClient.play().setResultCallback {
                         if (!it.status.isSuccess) Timber.e("Remote media client failed to play: ${it.status.statusMessage}")
                     }

@@ -1163,7 +1163,7 @@ fun UnifiedPlayerSheet(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SongMetadataDisplaySection( // Renamed for clarity
+fun SongMetadataDisplaySection( // Renamed for clarity
     song: Song?, // Nullable, comes from stablePlayerState
     expansionFraction: Float,
     textColor: Color,
@@ -1999,7 +1999,7 @@ fun AnimatedPlaybackControls(
 }
 
 @Composable
-private fun BottomToggleRow(
+fun BottomToggleRow(
     modifier: Modifier,
     isShuffleEnabled: Boolean,
     repeatMode: Int,
