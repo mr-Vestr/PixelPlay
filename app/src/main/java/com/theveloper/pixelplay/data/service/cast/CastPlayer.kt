@@ -2,6 +2,7 @@ package com.theveloper.pixelplay.data.service.cast
 
 import android.net.Uri
 import com.google.android.gms.cast.MediaLoadOptions
+import com.google.android.gms.cast.MediaStatus
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import com.theveloper.pixelplay.data.model.Song
@@ -18,12 +19,11 @@ class CastPlayer(castSession: CastSession) : Playback, RemoteMediaClient.Callbac
 
     init {
         remoteMediaClient?.registerCallback(this)
-        // Optional: Set initial playback rate or other settings.
         remoteMediaClient?.setPlaybackRate(1.0)
     }
 
     override val isPlaying: Boolean
-        get() = remoteMediaClient?.isPlaying == true || (remoteMediaClient?.isConnecting == true && isActuallyPlaying)
+        get() = remoteMediaClient?.isPlaying == true || isActuallyPlaying
 
     override fun setDataSource(song: Song, force: Boolean, completion: (success: Boolean) -> Unit) {
         try {
@@ -48,7 +48,6 @@ class CastPlayer(castSession: CastSession) : Playback, RemoteMediaClient.Callbac
         }
     }
 
-    // This is not used in a simple, single-track casting scenario.
     override fun setNextDataSource(path: Uri?) {}
 
     override fun start(): Boolean {
@@ -85,15 +84,13 @@ class CastPlayer(castSession: CastSession) : Playback, RemoteMediaClient.Callbac
         return whereto
     }
 
-    // RemoteMediaClient.Callback methods
     override fun onStatusUpdated() {
         super.onStatusUpdated()
         val playerState = remoteMediaClient?.playerState ?: return
         callbacks?.onPlaybackStatusChanged(playerState)
-    }
 
-    override fun onMediaSessionEnded() {
-        super.onMediaSessionEnded()
-        callbacks?.onCompletion()
+        if (playerState == MediaStatus.PLAYER_STATE_IDLE && remoteMediaClient?.idleReason == MediaStatus.IDLE_REASON_FINISHED) {
+            callbacks?.onCompletion()
+        }
     }
 }
