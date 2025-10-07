@@ -149,12 +149,12 @@ fun RoundedHorizontalMultiBrowseCarousel(
     val density = LocalDensity.current
     val carouselWidthPx = with(density) { carouselWidth.toPx() }
 
-//    val maxNonFocalItems = when (carouselStyle) {
-//        CarouselStyle.NO_PEEK -> 0
-//        CarouselStyle.ONE_PEEK -> 1
-//        CarouselStyle.TWO_PEEK -> 2
-//        else -> 1 // Default to one peek
-//    }
+    val maxNonFocalItems = when (carouselStyle) {
+        CarouselStyle.NO_PEEK -> 0
+        CarouselStyle.ONE_PEEK -> 1
+        CarouselStyle.TWO_PEEK -> 2
+        else -> 1 // Default to one peek
+    }
 
     val maxNonFocalItems = when (carouselStyle) {
         CarouselStyle.NO_PEEK -> 0
@@ -441,121 +441,121 @@ private fun Modifier.carouselItem(
     carouselStyle: String,
 ): Modifier = composed {
     val animatedAlpha by animateFloatAsState(
-        targetValue = if (carouselStyle == CarouselStyle.ONE_PEEK && index > state.pagerState.currentPage + 1) 0f else 1f,
-        animationSpec = tween(durationMillis = 200)
+        targetValue = when(carouselStyle) {
+            CarouselStyle.ONE_PEEK -> if (index > state.pagerState.currentPage + 1) 0f else 1f
+            CarouselStyle.TWO_PEEK -> if (index < state.pagerState.currentPage - 1 || index > state.pagerState.currentPage + 1) 0f else 1f
+            else -> 1f
+        },
+        animationSpec = tween(durationMillis = 200), label = ""
     )
 
     layout { measurable, constraints ->
-        val strategyResult = strategy()
-        if (!strategyResult.isValid) return@layout layout(0, 0) {}
+    val strategyResult = strategy()
+    if (!strategyResult.isValid) return@layout layout(0, 0) {}
 
-        val isVertical = state.pagerState.layoutInfo.orientation == Orientation.Vertical
-        val isRtl = layoutDirection == LayoutDirection.Rtl
+    val isVertical = state.pagerState.layoutInfo.orientation == Orientation.Vertical
+    val isRtl = layoutDirection == LayoutDirection.Rtl
 
-        val mainAxisSize = strategyResult.itemMainAxisSize
-        val itemConstraints =
-            if (isVertical) {
-                constraints.copy(
-                    minHeight = mainAxisSize.roundToInt(),
-                    maxHeight = mainAxisSize.roundToInt()
+    val mainAxisSize = strategyResult.itemMainAxisSize
+    val itemConstraints =
+        if (isVertical) {
+            constraints.copy(
+                minHeight = mainAxisSize.roundToInt(),
+                maxHeight = mainAxisSize.roundToInt()
+            )
+        } else {
+            constraints.copy(
+                minWidth = mainAxisSize.roundToInt(),
+                maxWidth = mainAxisSize.roundToInt()
+            )
+        }
+
+    val placeable = measurable.measure(itemConstraints)
+    val itemZIndex =
+        if (index == state.pagerState.currentPage) 1f
+        else if (index == 0) 0f
+        else 1f / index.toFloat()
+
+    layout(placeable.width, placeable.height) {
+        placeable.placeWithLayer(0, 0, zIndex = itemZIndex) {
+            // --- keylines e interpolación
+            val scrollOffset = calculateCurrentScrollOffset(state, strategyResult)
+            val maxScrollOffset = calculateMaxScrollOffset(state, strategyResult)
+            val keylines = strategyResult.getKeylineListForScrollOffset(scrollOffset, maxScrollOffset)
+            val roundedKeylines =
+                strategyResult.getKeylineListForScrollOffset(
+                    scrollOffset, maxScrollOffset, roundToNearestStep = true
                 )
+
+            val itemSizeWithSpacing =
+                strategyResult.itemMainAxisSize + strategyResult.itemSpacing
+            val unadjustedCenter =
+                (index * itemSizeWithSpacing) +
+                        (strategyResult.itemMainAxisSize / 2f) - scrollOffset
+
+            val before = keylines.getKeylineBefore(unadjustedCenter)
+            val after = keylines.getKeylineAfter(unadjustedCenter)
+            val progress = getProgress(before, after, unadjustedCenter)
+            val ik = lerp(before, after, progress) // interpolated keyline
+            val isOutOfKeylineBounds = before == after
+
+            // --- centro local (coords del layer) y dimensiones de máscara
+            val centerLocalX =
+                if (isVertical) size.width / 2f else strategyResult.itemMainAxisSize / 2f
+            val centerLocalY =
+                if (isVertical) strategyResult.itemMainAxisSize / 2f else size.height / 2f
+            val halfMaskW = if (isVertical) size.width / 2f else ik.size / 2f
+            val halfMaskH = if (isVertical) ik.size / 2f else size.height / 2f
+
+            // --- rect base (local)
+            var left   = centerLocalX - halfMaskW
+            var right  = centerLocalX + halfMaskW
+            var top    = centerLocalY - halfMaskH
+            var bottom = centerLocalY + halfMaskH
+
+            // --- recorte por desbordes contra el viewport del carrusel
+            //     (evita que el contenedor "aplaste" el arco del peek)
+            val containerSize = strategyResult.availableSpace
+            if (!isVertical) {
+                val centerInContainer = ik.offset
+                val overflowLeft  = kotlin.math.max(0f, 0f - (centerInContainer - halfMaskW))
+                val overflowRight = kotlin.math.max(0f, (centerInContainer + halfMaskW) - containerSize)
+                left  += overflowLeft
+                right -= overflowRight
             } else {
-                constraints.copy(
-                    minWidth = mainAxisSize.roundToInt(),
-                    maxWidth = mainAxisSize.roundToInt()
-                )
+                val centerInContainer = ik.offset
+                val overflowTop    = kotlin.math.max(0f, 0f - (centerInContainer - halfMaskH))
+                val overflowBottom = kotlin.math.max(0f, (centerInContainer + halfMaskH) - containerSize)
+                top    += overflowTop
+                bottom -= overflowBottom
             }
 
-        val placeable = measurable.measure(itemConstraints)
-        val itemZIndex =
-            if (index == state.pagerState.currentPage) 1f
-            else if (index == 0) 0f
-            else 1f / index.toFloat()
+            // --- limitar además al propio layer (seguro)
+            val layerBounds = Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
+            val maskRect = Rect(left, top, right, bottom).intersect(layerBounds)
 
-        layout(placeable.width, placeable.height) {
-            placeable.placeWithLayer(0, 0, zIndex = itemZIndex) {
-                // --- keylines e interpolación
-                val scrollOffset = calculateCurrentScrollOffset(state, strategyResult)
-                val maxScrollOffset = calculateMaxScrollOffset(state, strategyResult)
-                val keylines =
-                    strategyResult.getKeylineListForScrollOffset(scrollOffset, maxScrollOffset)
-                val roundedKeylines =
-                    strategyResult.getKeylineListForScrollOffset(
-                        scrollOffset, maxScrollOffset, roundToNearestStep = true
-                    )
+            // --- actualizar info para la máscara (para MaskScope, etc.)
+            carouselItemDrawInfo.sizeState = ik.size
+            carouselItemDrawInfo.minSizeState = roundedKeylines.minBy { it.size }.size
+            carouselItemDrawInfo.maxSizeState = roundedKeylines.firstFocal.size
+            carouselItemDrawInfo.maskRectState = maskRect
 
-                val itemSizeWithSpacing =
-                    strategyResult.itemMainAxisSize + strategyResult.itemSpacing
-                val unadjustedCenter =
-                    (index * itemSizeWithSpacing) +
-                            (strategyResult.itemMainAxisSize / 2f) - scrollOffset
+            // --- CLIP: siempre activado con la forma redondeada
+            clip = true
+            shape = clipShape
 
-                val before = keylines.getKeylineBefore(unadjustedCenter)
-                val after = keylines.getKeylineAfter(unadjustedCenter)
-                val progress = getProgress(before, after, unadjustedCenter)
-                val ik = lerp(before, after, progress) // interpolated keyline
-                val isOutOfKeylineBounds = before == after
+            // --- ALPHA: oculta items extra en modo ONE_PEEK
+            alpha = animatedAlpha
 
-                // --- centro local (coords del layer) y dimensiones de máscara
-                val centerLocalX =
-                    if (isVertical) size.width / 2f else strategyResult.itemMainAxisSize / 2f
-                val centerLocalY =
-                    if (isVertical) strategyResult.itemMainAxisSize / 2f else size.height / 2f
-                val halfMaskW = if (isVertical) size.width / 2f else ik.size / 2f
-                val halfMaskH = if (isVertical) ik.size / 2f else size.height / 2f
-
-                // --- rect base (local)
-                var left = centerLocalX - halfMaskW
-                var right = centerLocalX + halfMaskW
-                var top = centerLocalY - halfMaskH
-                var bottom = centerLocalY + halfMaskH
-
-                // --- recorte por desbordes contra el viewport del carrusel
-                //     (evita que el contenedor "aplaste" el arco del peek)
-                val containerSize = strategyResult.availableSpace
-                if (!isVertical) {
-                    val centerInContainer = ik.offset
-                    val overflowLeft = kotlin.math.max(0f, 0f - (centerInContainer - halfMaskW))
-                    val overflowRight =
-                        kotlin.math.max(0f, (centerInContainer + halfMaskW) - containerSize)
-                    left += overflowLeft
-                    right -= overflowRight
-                } else {
-                    val centerInContainer = ik.offset
-                    val overflowTop = kotlin.math.max(0f, 0f - (centerInContainer - halfMaskH))
-                    val overflowBottom =
-                        kotlin.math.max(0f, (centerInContainer + halfMaskH) - containerSize)
-                    top += overflowTop
-                    bottom -= overflowBottom
-                }
-
-                // --- limitar además al propio layer (seguro)
-                val layerBounds = Rect(0f, 0f, size.width.toFloat(), size.height.toFloat())
-                val maskRect = Rect(left, top, right, bottom).intersect(layerBounds)
-
-                // --- actualizar info para la máscara (para MaskScope, etc.)
-                carouselItemDrawInfo.sizeState = ik.size
-                carouselItemDrawInfo.minSizeState = roundedKeylines.minBy { it.size }.size
-                carouselItemDrawInfo.maxSizeState = roundedKeylines.firstFocal.size
-                carouselItemDrawInfo.maskRectState = maskRect
-
-                // --- CLIP: siempre activado con la forma redondeada
-                clip = true
-                shape = clipShape
-
-                // --- ALPHA: oculta items extra en modo ONE_PEEK
-                alpha = animatedAlpha
-
-                // --- traslación final (pegado de bordes)
-                var translation = ik.offset - unadjustedCenter
-                if (isOutOfKeylineBounds) {
-                    val outOfBoundsOffset =
-                        (unadjustedCenter - ik.unadjustedOffset) / ik.size
-                    translation += outOfBoundsOffset
-                }
-                if (isVertical) translationY = translation
-                else translationX = if (isRtl) -translation else translation
+            // --- traslación final (pegado de bordes)
+            var translation = ik.offset - unadjustedCenter
+            if (isOutOfKeylineBounds) {
+                val outOfBoundsOffset =
+                    (unadjustedCenter - ik.unadjustedOffset) / ik.size
+                translation += outOfBoundsOffset
             }
+            if (isVertical) translationY = translation
+            else translationX = if (isRtl) -translation else translation
         }
     }
 }
@@ -1450,7 +1450,6 @@ private class KeylineListScopeImpl : KeylineListScope {
         val right = center + size / 2f
         return left < 0f && right > 0f
     }
-
     private fun isCutoffRight(size: Float, center: Float, carouselMainAxisSize: Float): Boolean {
         val left = center - size / 2f
         val right = center + size / 2f

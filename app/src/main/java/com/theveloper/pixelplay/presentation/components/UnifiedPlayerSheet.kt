@@ -1702,7 +1702,6 @@ private fun FullPlayerContentInternal(
             val albumArtContainerModifier = Modifier
                 .fillMaxWidth() // Let the carousel manage its width
                 .padding(vertical = lerp(4.dp, 8.dp, expansionFraction))
-                .height(lerp(150.dp, 260.dp, expansionFraction)) // Adjust height for carousel
                 .graphicsLayer { alpha = expansionFraction }
 
             // Album Cover section - uses new Composable
