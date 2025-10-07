@@ -722,6 +722,12 @@ class PlayerViewModel @Inject constructor(
             override fun onSessionSuspended(session: CastSession, reason: Int) {
                 transferPlaybackToLocal()
             }
+
+            override fun onSessionEnding(session: CastSession) {}
+            override fun onSessionStarting(session: CastSession) {}
+            override fun onSessionStartFailed(session: CastSession, error: Int) {}
+            override fun onSessionResuming(session: CastSession, sessionId: String) {}
+            override fun onSessionResumeFailed(session: CastSession, error: Int) {}
         }
         sessionManager.addSessionManagerListener(castSessionManagerListener as SessionManagerListener<CastSession>, CastSession::class.java)
 
@@ -790,7 +796,7 @@ class PlayerViewModel @Inject constructor(
                 val startIndex = if (songId != null) {
                     lastQueue.indexOfFirst { it.id == songId }
                 } else {
-                    lastStatus.currentIndex
+                    lastStatus.getCurrentItemIndex()
                 }.coerceAtLeast(0)
 
                 // Restore queue
@@ -833,7 +839,7 @@ class PlayerViewModel @Inject constructor(
         remoteMediaClientCallback = object : RemoteMediaClient.Callback() {
             override fun onStatusUpdated() {
                 val status = remoteMediaClient.mediaStatus ?: return
-                val currentItem = status.currentItem
+                val currentItem = status.getCurrentItem()
                 val songId = currentItem?.customData?.optString("songId")
                 val song = _masterAllSongs.value.find { it.id == songId }
 
@@ -1179,7 +1185,7 @@ class PlayerViewModel @Inject constructor(
 
         if (castPlayer != null) {
             val remoteMediaClient = castPlayer!!.remoteMediaClient
-            val itemInQueue = remoteMediaClient?.mediaQueue?.items?.find { it.customData?.optString("songId") == song.id }
+            val itemInQueue = remoteMediaClient?.mediaQueue?.queueItems?.find { it.customData?.optString("songId") == song.id }
 
             if (itemInQueue != null) {
                 // Song is already in the remote queue, just jump to it and play.
@@ -1923,7 +1929,7 @@ class PlayerViewModel @Inject constructor(
 
     private fun startProgressUpdates() {
         // Do not start local progress polling if we are casting
-        if (_castSession.value != null) return
+        if (castPlayer != null) return
 
         stopProgressUpdates()
         progressJob = viewModelScope.launch {
