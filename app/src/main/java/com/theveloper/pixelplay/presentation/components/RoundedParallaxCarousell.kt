@@ -950,9 +950,17 @@ private fun createKeylineListFromArrangement(
 ): KeylineList {
     return keylineListOf(carouselMainAxisSize, itemSpacing, alignment) {
         add(leftAnchorSize, isAnchor = true)
-        repeat(arrangement.largeCount) { add(arrangement.largeSize) }
-        repeat(arrangement.mediumCount) { add(arrangement.mediumSize) }
-        repeat(arrangement.smallCount) { add(arrangement.smallSize) }
+        if (alignment == CarouselAlignment.Center && arrangement.smallCount == 2 && arrangement.largeCount == 1) {
+            // Symmetrical layout for Two Peeks: [small, large, small]
+            add(arrangement.smallSize)
+            add(arrangement.largeSize)
+            add(arrangement.smallSize)
+        } else {
+            // Default layout for One Peek and No Peek
+            repeat(arrangement.largeCount) { add(arrangement.largeSize) }
+            repeat(arrangement.mediumCount) { add(arrangement.mediumSize) }
+            repeat(arrangement.smallCount) { add(arrangement.smallSize) }
+        }
         add(rightAnchorSize, isAnchor = true)
     }
 }
