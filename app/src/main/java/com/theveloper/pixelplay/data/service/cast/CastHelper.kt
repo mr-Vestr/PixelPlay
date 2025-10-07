@@ -8,9 +8,11 @@ import com.theveloper.pixelplay.data.model.Song
 import com.theveloper.pixelplay.data.service.http.MediaFileHttpServerService
 
 fun Song.toMediaInfo(): MediaInfo {
-    val baseAddress = MediaFileHttpServerService.serverAddress
-    val songUrl = "$baseAddress/song/${this.id}"
-    val albumArtUrl = "$baseAddress/art/${this.id}"
+    val serverAddress = MediaFileHttpServerService.serverAddress
+    // A placeholder IP is used here as the actual IP will be provided by the running server.
+    // This function relies on the server being active when it's called.
+    val songUrl = "${serverAddress ?: "http://127.0.0.1:8080"}/song?id=${this.id}"
+    val albumArtUrl = "${serverAddress ?: "http://127.0.0.1:8080"}/cover?id=${this.albumId}"
 
     val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
         putString(MediaMetadata.KEY_TITLE, this@toMediaInfo.title)

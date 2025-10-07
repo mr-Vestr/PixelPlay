@@ -451,8 +451,8 @@ class PlayerViewModel @Inject constructor(
             else -> favoriteSongsList
         }.toImmutableList()
     }
-        .flowOn(Dispatchers.Default) // Execute combine and transformations on Default dispatcher
-        .stateIn(viewModelScope, SharingStarted.Lazily, persistentListOf())
+    .flowOn(Dispatchers.Default) // Execute combine and transformations on Default dispatcher
+    .stateIn(viewModelScope, SharingStarted.Lazily, persistentListOf())
 
     private val _dailyMixSongs = MutableStateFlow<ImmutableList<Song>>(persistentListOf())
     val dailyMixSongs: StateFlow<ImmutableList<Song>> = _dailyMixSongs.asStateFlow()
@@ -594,8 +594,8 @@ class PlayerViewModel @Inject constructor(
                 val oldSyncingLibraryState = _playerUiState.value.isSyncingLibrary
                 _playerUiState.update { it.copy(isSyncingLibrary = isSyncing) }
 
-                if (oldSyncingLibraryState && !isSyncing) {
-                    Log.i("PlayerViewModel", "Sync completed. Calling resetAndLoadInitialData from isSyncingStateFlow observer.")
+        if (oldSyncingLibraryState && !isSyncing) {
+            Log.i("PlayerViewModel", "Sync completed. Calling resetAndLoadInitialData from isSyncingStateFlow observer.")
                     resetAndLoadInitialData("isSyncingStateFlow observer")
                 }
             }
@@ -1081,7 +1081,7 @@ class PlayerViewModel @Inject constructor(
             Log.d("PlayerViewModelPerformance", "loadSongsFromRepository (Single Action) START")
 
             if (!_playerUiState.value.isLoadingInitialSongs) {
-                _playerUiState.update { it.copy(isLoadingInitialSongs = true) }
+                 _playerUiState.update { it.copy(isLoadingInitialSongs = true) }
             }
 
             try {
@@ -1202,7 +1202,7 @@ class PlayerViewModel @Inject constructor(
                         isLoadingLibraryCategories = false
                     )
                 }
-                Log.d("PlayerViewModelPerformance", "loadArtistsFromRepository (All) END. Total time: ${System.currentTimeMillis() - functionStartTime} ms. Artists loaded: ${allArtistsList.size}")
+                 Log.d("PlayerViewModelPerformance", "loadArtistsFromRepository (All) END. Total time: ${System.currentTimeMillis() - functionStartTime} ms. Artists loaded: ${allArtistsList.size}")
             } catch (e: Exception) {
                 Log.e("PlayerViewModel", "Error loading all artists from getAllArtistsOnce", e)
                 _playerUiState.update { it.copy(isLoadingLibraryCategories = false) }
