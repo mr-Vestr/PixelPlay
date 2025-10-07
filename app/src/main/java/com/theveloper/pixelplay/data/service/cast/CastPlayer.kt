@@ -1,96 +1,81 @@
 package com.theveloper.pixelplay.data.service.cast
 
-import android.net.Uri
-import com.google.android.gms.cast.MediaLoadOptions
+import com.google.android.gms.cast.MediaQueueItem
+import com.google.android.gms.cast.MediaSeekOptions
 import com.google.android.gms.cast.MediaStatus
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import com.theveloper.pixelplay.data.model.Song
-import com.theveloper.pixelplay.data.service.player.Playback
-import timber.log.Timber
+import org.json.JSONObject
 
-class CastPlayer(castSession: CastSession) : Playback, RemoteMediaClient.Callback() {
-    override val isInitialized = true
-    override val audioSessionId = 0 // Not applicable for Cast
-    override var callbacks: Playback.PlaybackCallbacks? = null
+class CastPlayer(castSession: CastSession) {
 
-    private val remoteMediaClient: RemoteMediaClient? = castSession.remoteMediaClient
-    private var isActuallyPlaying = false
+    val remoteMediaClient: RemoteMediaClient? = castSession.remoteMediaClient
 
-    init {
-        remoteMediaClient?.registerCallback(this)
-        remoteMediaClient?.setPlaybackRate(1.0)
+    fun loadQueue(songs: List<Song>, startSong: Song, startPosition: Long) {
+        if (songs.isEmpty()) return
+
+        val queueItems = songs.map { it.toMediaQueueItem() }.toTypedArray()
+        val startIndex = songs.indexOf(startSong).coerceAtLeast(0)
+
+        val repeatMode = remoteMediaClient?.mediaStatus?.queueRepeatMode ?: MediaStatus.REPEAT_MODE_REPEAT_OFF
+
+        remoteMediaClient?.queueLoad(
+            queueItems,
+            startIndex,
+            repeatMode,
+            startPosition,
+            null
+        )
     }
 
-    override val isPlaying: Boolean
-        get() = remoteMediaClient?.isPlaying == true || isActuallyPlaying
-
-    override fun setDataSource(song: Song, force: Boolean, completion: (success: Boolean) -> Unit) {
-        try {
-            val mediaInfo = song.toMediaInfo()
-            val mediaLoadOptions = MediaLoadOptions.Builder()
-                .setPlayPosition(0)
-                .setAutoplay(true)
-                .build()
-
-            remoteMediaClient?.load(mediaInfo, mediaLoadOptions)?.setResultCallback { result ->
-                if (result.status.isSuccess) {
-                    Timber.d("CastPlayer: Media loaded successfully.")
-                    completion(true)
-                } else {
-                    Timber.e("CastPlayer: Error loading media. Code: ${result.status.statusCode}, Message: ${result.status.statusMessage}")
-                    completion(false)
-                }
-            } ?: completion(false)
-        } catch (e: Exception) {
-            Timber.e(e, "CastPlayer: Exception in setDataSource")
-            completion(false)
-        }
-    }
-
-    override fun setNextDataSource(path: Uri?) {}
-
-    override fun start(): Boolean {
-        isActuallyPlaying = true
+    fun play() {
         remoteMediaClient?.play()
-        return true
     }
 
-    override fun stop() {
-        isActuallyPlaying = false
-        remoteMediaClient?.stop()
-    }
-
-    override fun release() {
-        remoteMediaClient?.unregisterCallback(this)
-    }
-
-    override fun pause(): Boolean {
-        isActuallyPlaying = false
+    fun pause() {
         remoteMediaClient?.pause()
-        return true
     }
 
-    override fun duration(): Int {
-        return remoteMediaClient?.mediaInfo?.streamDuration?.toInt() ?: 0
+    fun seekTo(position: Long) {
+        val options = MediaSeekOptions.Builder()
+            .setPosition(position)
+            .setResumeState(MediaSeekOptions.RESUME_STATE_UNCHANGED)
+            .build()
+        remoteMediaClient?.seek(options)
     }
 
-    override fun position(): Int {
-        return remoteMediaClient?.approximateStreamPosition?.toInt() ?: 0
+    fun next() {
+        remoteMediaClient?.queueNext(null)
     }
 
-    override fun seek(whereto: Int, force: Boolean): Int {
-        remoteMediaClient?.seek(whereto.toLong())
-        return whereto
+    fun previous() {
+        remoteMediaClient?.queuePrev(null)
     }
 
-    override fun onStatusUpdated() {
-        super.onStatusUpdated()
-        val playerState = remoteMediaClient?.playerState ?: return
-        callbacks?.onPlaybackStatusChanged(playerState)
+    fun setRepeatMode(repeatMode: Int) {
+        remoteMediaClient?.queueSetRepeatMode(repeatMode, null)
+    }
 
-        if (playerState == MediaStatus.PLAYER_STATE_IDLE && remoteMediaClient?.idleReason == MediaStatus.IDLE_REASON_FINISHED) {
-            callbacks?.onCompletion()
+    fun setShuffleMode(enabled: Boolean) {
+        val repeatMode = if (enabled) {
+            MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE
+        } else {
+            // When disabling shuffle, revert to REPEAT_OFF. A more advanced implementation
+            // might restore the previous non-shuffle repeat mode.
+            MediaStatus.REPEAT_MODE_REPEAT_OFF
         }
+        remoteMediaClient?.queueSetRepeatMode(repeatMode, null)
+    }
+
+    private fun Song.toMediaQueueItem(): MediaQueueItem {
+        // The customData can be used to store the original song ID for later retrieval
+        // from the MediaQueueItem, which is crucial for state restoration.
+        val customData = JSONObject().apply {
+            put("songId", this@toMediaQueueItem.id)
+        }
+        return MediaQueueItem.Builder(this.toMediaInfo())
+            .setCustomData(customData)
+            .build()
     }
 }

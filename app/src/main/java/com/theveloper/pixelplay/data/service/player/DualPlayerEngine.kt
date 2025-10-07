@@ -1,18 +1,15 @@
 package com.theveloper.pixelplay.data.service.player
 
 import android.content.Context
-import android.net.Uri
 import androidx.annotation.OptIn
-import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
-import com.theveloper.pixelplay.data.model.Song
+//import androidx.media3.exoplayer.ffmpeg.FfmpegAudioRenderer
 import com.theveloper.pixelplay.data.model.TransitionSettings
 import com.theveloper.pixelplay.utils.envelope
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -25,99 +22,30 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Manages two ExoPlayer instances (A and B) to enable seamless transitions.
+ *
+ * Player A is the designated "master" player, which is exposed to the MediaSession.
+ * Player B is the auxiliary player used to pre-buffer and fade in the next track.
+ * After a transition, Player A adopts the state of Player B, ensuring continuity.
+ */
 @OptIn(UnstableApi::class)
-@Singleton
 class DualPlayerEngine @Inject constructor(
     @ApplicationContext private val context: Context,
-) : Playback {
+) {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var transitionJob: Job? = null
 
     private val playerA: ExoPlayer
     private val playerB: ExoPlayer
 
+    /** The master player instance that should be connected to the MediaSession. */
     val masterPlayer: Player
         get() = playerA
-
-    override val isInitialized: Boolean = true
-    override val isPlaying: Boolean
-        get() = playerA.isPlaying
-    override val audioSessionId: Int
-        get() = playerA.audioSessionId
-    override var callbacks: Playback.PlaybackCallbacks? = null
 
     init {
         playerA = buildPlayer()
         playerB = buildPlayer()
-        playerA.addListener(PlayerListener())
-    }
-
-    private inner class PlayerListener : Player.Listener {
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            callbacks?.onPlaybackStatusChanged(playbackState)
-            if (playbackState == Player.STATE_ENDED) {
-                callbacks?.onCompletion()
-            }
-        }
-
-        override fun onPlayerError(error: PlaybackException) {
-            callbacks?.onPlaybackStatusChanged(Player.STATE_IDLE)
-        }
-    }
-
-    override fun setDataSource(song: Song, force: Boolean, completion: (success: Boolean) -> Unit) {
-        try {
-            val mediaItem = MediaItem.fromUri(song.contentUriString.toUri())
-            playerA.setMediaItem(mediaItem)
-            playerA.prepare()
-            playerA.addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_READY) {
-                        completion(true)
-                        playerA.removeListener(this)
-                    }
-                }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    completion(false)
-                    playerA.removeListener(this)
-                }
-            })
-        } catch (e: Exception) {
-            e.printStackTrace()
-            completion(false)
-        }
-    }
-
-    override fun setNextDataSource(path: Uri?) {
-        if (path != null) {
-            prepareNext(MediaItem.fromUri(path))
-        } else {
-            cancelNext()
-        }
-    }
-
-    override fun start(): Boolean {
-        playerA.play()
-        return true
-    }
-
-    override fun stop() {
-        playerA.stop()
-    }
-
-    override fun pause(): Boolean {
-        playerA.pause()
-        return true
-    }
-
-    override fun duration(): Int = playerA.duration.takeIf { it != C.TIME_UNSET }?.toInt() ?: 0
-
-    override fun position(): Int = playerA.currentPosition.toInt()
-
-    override fun seek(whereto: Int, force: Boolean): Int {
-        playerA.seekTo(whereto.toLong())
-        return whereto
     }
 
     private fun buildPlayer(): ExoPlayer {
@@ -135,6 +63,9 @@ class DualPlayerEngine @Inject constructor(
         }
     }
 
+    /**
+     * Prepares the auxiliary player (Player B) with the next media item.
+     */
     fun prepareNext(mediaItem: MediaItem) {
         playerB.stop()
         playerB.clearMediaItems()
@@ -142,6 +73,9 @@ class DualPlayerEngine @Inject constructor(
         playerB.prepare()
     }
 
+    /**
+     * If a track was pre-buffered in Player B, this cancels it.
+     */
     fun cancelNext() {
         if (playerB.mediaItemCount > 0) {
             playerB.stop()
@@ -149,6 +83,9 @@ class DualPlayerEngine @Inject constructor(
         }
     }
 
+    /**
+     * Executes a transition based on the provided settings.
+     */
     fun performTransition(settings: TransitionSettings) {
         transitionJob?.cancel()
         transitionJob = scope.launch {
@@ -156,7 +93,7 @@ class DualPlayerEngine @Inject constructor(
                 com.theveloper.pixelplay.data.model.TransitionMode.FADE_IN_OUT -> performFadeInOutTransition(settings)
                 com.theveloper.pixelplay.data.model.TransitionMode.OVERLAP, com.theveloper.pixelplay.data.model.TransitionMode.SMOOTH -> performOverlapTransition(settings)
                 com.theveloper.pixelplay.data.model.TransitionMode.NONE -> {
-                    // No transition logic needed
+                    // No transition logic needed, the default player behavior should suffice.
                 }
             }
         }
@@ -167,6 +104,7 @@ class DualPlayerEngine @Inject constructor(
         val halfDuration = settings.durationMs.toLong() / 2
         if (halfDuration <= 0) return
 
+        // 1. Fade Out Player A
         var elapsed = 0L
         while (elapsed < halfDuration) {
             val progress = elapsed.toFloat() / halfDuration
@@ -177,6 +115,7 @@ class DualPlayerEngine @Inject constructor(
         playerA.volume = 0f
         playerA.stop()
 
+        // 2. Start Player B (already prepared) and fade it in.
         playerB.volume = 0f
         playerB.play()
         elapsed = 0L
@@ -188,6 +127,9 @@ class DualPlayerEngine @Inject constructor(
         }
         playerB.volume = 1f
 
+        // 3. Handover to Player A.
+        // Player A is the master player and its timeline is managed by the MediaController.
+        // We just need to tell it to move to the next item and sync its state with Player B.
         if (playerA.hasNextMediaItem()) {
             playerA.seekToNextMediaItem()
             playerA.seekTo(playerB.currentPosition)
@@ -195,6 +137,7 @@ class DualPlayerEngine @Inject constructor(
             playerA.play()
         }
 
+        // 4. Clean up Player B
         playerB.stop()
         playerB.clearMediaItems()
     }
@@ -202,6 +145,7 @@ class DualPlayerEngine @Inject constructor(
     private suspend fun performOverlapTransition(settings: TransitionSettings) {
         if (playerB.mediaItemCount == 0) return
 
+        // 1. Start Player B and ramp volumes
         playerB.volume = 0f
         playerB.play()
 
@@ -217,8 +161,10 @@ class DualPlayerEngine @Inject constructor(
         playerA.volume = 0f
         playerB.volume = 1f
 
+        // 2. Stop Player A after fade-out is complete
         playerA.stop()
 
+        // 3. Handover to Player A.
         if (playerA.hasNextMediaItem()) {
             playerA.seekToNextMediaItem()
             playerA.seekTo(playerB.currentPosition)
@@ -226,11 +172,15 @@ class DualPlayerEngine @Inject constructor(
             playerA.play()
         }
 
+        // 4. Clean up Player B
         playerB.stop()
         playerB.clearMediaItems()
     }
 
-    override fun release() {
+    /**
+     * Cleans up resources when the engine is no longer needed.
+     */
+    fun release() {
         transitionJob?.cancel()
         playerA.release()
         playerB.release()
