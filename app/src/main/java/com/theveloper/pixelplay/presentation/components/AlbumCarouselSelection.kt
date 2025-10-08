@@ -100,9 +100,7 @@ fun AlbumCarouselSection(
             itemSpacing = itemSpacing,
             itemCornerRadius = corner,
             contentPadding = contentPadding,
-            preferredItemWidth = preferredItemWidth,
-            carouselAlignment = carouselAlignment,
-            itemCount = queue.size
+            preferredItemWidth = preferredItemWidth
         ) { index ->
             val song = queue[index]
             Box(Modifier.fillMaxSize().aspectRatio(1f)) {
