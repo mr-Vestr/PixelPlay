@@ -9,11 +9,22 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import coil.size.Size
 import com.theveloper.pixelplay.data.model.Song
-import com.theveloper.pixelplay.data.preferences.CarouselStyle
 import kotlinx.collections.immutable.ImmutableList
+
+// ====== TIPOS/STATE DEL CARRUSEL (wrapper para mantener compatibilidad) ======
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun rememberRoundedParallaxCarouselState(
+    initialPage: Int,
+    pageCount: () -> Int
+): CarouselState = rememberCarouselState(initialItem = initialPage, itemCount = pageCount)
+
+// ====== TU SECCIÓN: ACOPLADA AL NUEVO API ======
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +44,7 @@ fun AlbumCarouselSection(
         pageCount = { queue.size }
     )
 
+    // Player -> Carousel
     val currentSongIndex by remember {
         derivedStateOf {
             queue.indexOf(currentSong).coerceAtLeast(0)
@@ -61,18 +73,17 @@ fun AlbumCarouselSection(
     BoxWithConstraints(modifier = modifier) {
         val availableWidth = this.maxWidth
 
-        val (preferredItemWidth, contentPadding, isScrollEnabled) = when (carouselStyle) {
+        val (preferredItemWidth, contentPadding, carouselHeight, isScrollEnabled) = when (carouselStyle) {
             CarouselStyle.NO_PEEK -> {
                 val itemWidth = availableWidth * 0.85f
                 val padding = (availableWidth - itemWidth) / 2
-                Triple(itemWidth, PaddingValues(horizontal = padding), true)
+                Triple(itemWidth, PaddingValues(horizontal = padding), itemWidth, true)
             }
             else -> { // Default to One Peek
-                Triple(availableWidth * 0.8f, PaddingValues(horizontal = availableWidth * 0.1f), true)
+                val itemWidth = availableWidth * 0.8f
+                Triple(itemWidth, PaddingValues(horizontal = (availableWidth * 0.1f)), itemWidth, true)
             }
         }
-
-        val carouselHeight = preferredItemWidth
 
         RoundedHorizontalMultiBrowseCarousel(
             state = carouselState,
