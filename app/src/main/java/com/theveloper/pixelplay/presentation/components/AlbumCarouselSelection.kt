@@ -26,6 +26,13 @@ fun rememberRoundedParallaxCarouselState(
 
 // ====== TU SECCIÓN: ACOPLADA AL NUEVO API ======
 
+private data class CarouselConfig(
+    val preferredItemWidth: Dp,
+    val contentPadding: PaddingValues,
+    val carouselHeight: Dp,
+    val isScrollEnabled: Boolean
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlbumCarouselSection(
@@ -44,7 +51,6 @@ fun AlbumCarouselSection(
         pageCount = { queue.size }
     )
 
-    // Player -> Carousel
     val currentSongIndex by remember {
         derivedStateOf {
             queue.indexOf(currentSong).coerceAtLeast(0)
@@ -73,26 +79,26 @@ fun AlbumCarouselSection(
     BoxWithConstraints(modifier = modifier) {
         val availableWidth = this.maxWidth
 
-        val (preferredItemWidth, contentPadding, carouselHeight, isScrollEnabled) = when (carouselStyle) {
+        val config = when (carouselStyle) {
             CarouselStyle.NO_PEEK -> {
                 val itemWidth = availableWidth * 0.85f
                 val padding = (availableWidth - itemWidth) / 2
-                Triple(itemWidth, PaddingValues(horizontal = padding), itemWidth, true)
+                CarouselConfig(itemWidth, PaddingValues(horizontal = padding), itemWidth, true)
             }
             else -> { // Default to One Peek
                 val itemWidth = availableWidth * 0.8f
-                Triple(itemWidth, PaddingValues(horizontal = (availableWidth * 0.1f)), itemWidth, true)
+                CarouselConfig(itemWidth, PaddingValues(horizontal = (availableWidth * 0.1f)), itemWidth, true)
             }
         }
 
         RoundedHorizontalMultiBrowseCarousel(
             state = carouselState,
-            modifier = Modifier.height(carouselHeight),
+            modifier = Modifier.height(config.carouselHeight),
             itemSpacing = itemSpacing,
             itemCornerRadius = corner,
-            contentPadding = contentPadding,
-            preferredItemWidth = preferredItemWidth,
-            userScrollEnabled = isScrollEnabled,
+            contentPadding = config.contentPadding,
+            preferredItemWidth = config.preferredItemWidth,
+            userScrollEnabled = config.isScrollEnabled,
             carouselStyle = carouselStyle
         ) { index ->
             val song = queue[index]
