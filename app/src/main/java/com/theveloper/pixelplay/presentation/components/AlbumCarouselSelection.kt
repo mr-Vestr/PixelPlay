@@ -9,16 +9,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import coil.size.Size
 import com.theveloper.pixelplay.data.model.Song
 import com.theveloper.pixelplay.data.preferences.CarouselStyle
 import kotlinx.collections.immutable.ImmutableList
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.graphicsLayer
-import com.theveloper.pixelplay.presentation.viewmodel.PlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,8 +24,7 @@ fun AlbumCarouselSection(
     onSongSelected: (Song) -> Unit,
     modifier: Modifier = Modifier,
     carouselStyle: String = CarouselStyle.ONE_PEEK,
-    itemSpacing: Dp = 8.dp,
-    playerViewModel: PlayerViewModel
+    itemSpacing: Dp = 8.dp
 ) {
     if (queue.isEmpty()) return
 
@@ -67,40 +61,28 @@ fun AlbumCarouselSection(
     BoxWithConstraints(modifier = modifier) {
         val availableWidth = this.maxWidth
 
-        val preferredItemWidth: Dp
-        val contentPadding: PaddingValues
-        val carouselAlignment: CarouselAlignment
-
-        when (carouselStyle) {
+        val (preferredItemWidth, contentPadding, isScrollEnabled) = when (carouselStyle) {
             CarouselStyle.NO_PEEK -> {
-                preferredItemWidth = availableWidth
-                contentPadding = PaddingValues(0.dp)
-                carouselAlignment = CarouselAlignment.Center
-            }
-            CarouselStyle.ONE_PEEK -> {
-                preferredItemWidth = availableWidth * 0.8f
-                contentPadding = PaddingValues(horizontal = availableWidth * 0.1f)
-                carouselAlignment = CarouselAlignment.Start
-            }
-            CarouselStyle.TWO_PEEK -> {
-                preferredItemWidth = availableWidth * 0.7f
-                contentPadding = PaddingValues(horizontal = (availableWidth * 0.15f))
-                carouselAlignment = CarouselAlignment.Center
+                val itemWidth = availableWidth * 0.85f
+                val padding = (availableWidth - itemWidth) / 2
+                Triple(itemWidth, PaddingValues(horizontal = padding), true)
             }
             else -> { // Default to One Peek
-                preferredItemWidth = availableWidth * 0.8f
-                contentPadding = PaddingValues(horizontal = availableWidth * 0.1f)
-                carouselAlignment = CarouselAlignment.Start
+                Triple(availableWidth * 0.8f, PaddingValues(horizontal = availableWidth * 0.1f), true)
             }
         }
 
+        val carouselHeight = preferredItemWidth
+
         RoundedHorizontalMultiBrowseCarousel(
             state = carouselState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.height(carouselHeight),
             itemSpacing = itemSpacing,
             itemCornerRadius = corner,
             contentPadding = contentPadding,
-            preferredItemWidth = preferredItemWidth
+            preferredItemWidth = preferredItemWidth,
+            userScrollEnabled = isScrollEnabled,
+            carouselStyle = carouselStyle
         ) { index ->
             val song = queue[index]
             Box(Modifier.fillMaxSize().aspectRatio(1f)) {

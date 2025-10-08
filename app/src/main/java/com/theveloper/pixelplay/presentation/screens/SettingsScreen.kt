@@ -404,8 +404,7 @@ fun SettingsScreen(
                             description = "Choose the appearance for the album carousel.",
                             options = mapOf(
                                 CarouselStyle.NO_PEEK to "No Peek",
-                                CarouselStyle.ONE_PEEK to "One Peek",
-                                CarouselStyle.TWO_PEEK to "Two Peeks"
+                                CarouselStyle.ONE_PEEK to "One Peek"
                             ),
                             selectedKey = uiState.carouselStyle,
                             onSelectionChanged = { settingsViewModel.setCarouselStyle(it) },
