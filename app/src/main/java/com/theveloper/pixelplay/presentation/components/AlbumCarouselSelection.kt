@@ -15,17 +15,10 @@ import coil.size.Size
 import com.theveloper.pixelplay.data.model.Song
 import com.theveloper.pixelplay.data.preferences.CarouselStyle
 import kotlinx.collections.immutable.ImmutableList
-
-// ====== TIPOS/STATE DEL CARRUSEL (wrapper para mantener compatibilidad) ======
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun rememberRoundedParallaxCarouselState(
-    initialPage: Int,
-    pageCount: () -> Int
-): CarouselState = rememberCarouselState(initialItem = initialPage, itemCount = pageCount)
-
-// ====== TU SECCIÓN: ACOPLADA AL NUEVO API ======
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.graphicsLayer
+import com.theveloper.pixelplay.presentation.viewmodel.PlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,38 +29,36 @@ fun AlbumCarouselSection(
     onSongSelected: (Song) -> Unit,
     modifier: Modifier = Modifier,
     carouselStyle: String = CarouselStyle.ONE_PEEK,
-    itemSpacing: Dp = 8.dp
+    itemSpacing: Dp = 8.dp,
+    playerViewModel: PlayerViewModel
 ) {
     if (queue.isEmpty()) return
 
-    // Mantiene compatibilidad con tu llamada actual
-    val carouselState = rememberRoundedParallaxCarouselState(
+    val carouselState = rememberCarouselState(
         initialPage = queue.indexOf(currentSong).coerceAtLeast(0),
         pageCount = { queue.size }
     )
 
-    // Player -> Carousel
-    val currentSongIndex = remember(currentSong, queue) {
-        queue.indexOf(currentSong).coerceAtLeast(0)
+    val currentSongIndex by remember {
+        derivedStateOf {
+            queue.indexOf(currentSong).coerceAtLeast(0)
+        }
     }
-    LaunchedEffect(currentSongIndex, queue) {
-        if (carouselState.pagerState.currentPage != currentSongIndex) {
+
+    LaunchedEffect(currentSongIndex, queue.size) {
+        if (carouselState.currentPage != currentSongIndex) {
             carouselState.animateScrollToItem(currentSongIndex)
         }
     }
 
     val hapticFeedback = LocalHapticFeedback.current
-    // Carousel -> Player (cuando se detiene el scroll)
-    LaunchedEffect(carouselState, currentSongIndex, queue) {
-        snapshotFlow { carouselState.pagerState.isScrollInProgress }
+    LaunchedEffect(carouselState) {
+        snapshotFlow { carouselState.isScrollInProgress }
             .distinctUntilChanged()
-            .filter { !it }
+            .filter { !it && carouselState.currentPage != currentSongIndex }
             .collect {
-                val settled = carouselState.pagerState.currentPage
-                if (settled != currentSongIndex) {
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                    queue.getOrNull(settled)?.let(onSongSelected)
-                }
+                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                queue.getOrNull(carouselState.currentPage)?.let(onSongSelected)
             }
     }
 
@@ -76,25 +67,45 @@ fun AlbumCarouselSection(
     BoxWithConstraints(modifier = modifier) {
         val availableWidth = this.maxWidth
 
-        // The main item should be 80% of the container width for peek styles, and 100% for no-peek.
-        // This width dictates the height to maintain a 1:1 aspect ratio.
-        val carouselHeight = when (carouselStyle) {
-            CarouselStyle.NO_PEEK -> availableWidth
-            else -> availableWidth * 0.8f
+        val preferredItemWidth: Dp
+        val contentPadding: PaddingValues
+        val carouselAlignment: CarouselAlignment
+
+        when (carouselStyle) {
+            CarouselStyle.NO_PEEK -> {
+                preferredItemWidth = availableWidth
+                contentPadding = PaddingValues(0.dp)
+                carouselAlignment = CarouselAlignment.Center
+            }
+            CarouselStyle.ONE_PEEK -> {
+                preferredItemWidth = availableWidth * 0.8f
+                contentPadding = PaddingValues(horizontal = availableWidth * 0.1f)
+                carouselAlignment = CarouselAlignment.Start
+            }
+            CarouselStyle.TWO_PEEK -> {
+                preferredItemWidth = availableWidth * 0.7f
+                contentPadding = PaddingValues(horizontal = (availableWidth * 0.15f))
+                carouselAlignment = CarouselAlignment.Center
+            }
+            else -> { // Default to One Peek
+                preferredItemWidth = availableWidth * 0.8f
+                contentPadding = PaddingValues(horizontal = availableWidth * 0.1f)
+                carouselAlignment = CarouselAlignment.Start
+            }
         }
 
         RoundedHorizontalMultiBrowseCarousel(
             state = carouselState,
-            modifier = Modifier.height(carouselHeight), // Enforce 1:1 aspect ratio for the container
+            modifier = Modifier.fillMaxSize(),
             itemSpacing = itemSpacing,
             itemCornerRadius = corner,
-            carouselStyle = carouselStyle,
-            carouselWidth = availableWidth // Pass the full width for layout calculations
+            contentPadding = contentPadding,
+            preferredItemWidth = preferredItemWidth,
+            carouselAlignment = carouselAlignment,
+            itemCount = queue.size
         ) { index ->
             val song = queue[index]
-            Box(Modifier
-                .fillMaxSize()
-                .aspectRatio(1f)) { // Enforce 1:1 aspect ratio for the item itself
+            Box(Modifier.fillMaxSize().aspectRatio(1f)) {
                 OptimizedAlbumArt(
                     uri = song.albumArtUriString,
                     title = song.title,

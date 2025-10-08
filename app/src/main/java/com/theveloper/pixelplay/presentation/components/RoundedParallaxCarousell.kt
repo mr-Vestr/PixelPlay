@@ -1,6 +1,5 @@
 package com.theveloper.pixelplay.presentation.components
 
-import androidx.compose.ui.composed
 import androidx.annotation.FloatRange
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -48,7 +47,6 @@ import androidx.compose.ui.util.fastMapIndexed
 import kotlin.math.*
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Path
-import com.theveloper.pixelplay.data.preferences.CarouselStyle
 import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 
 // Utilidad para “inflar” un rect en px (evita hairlines)
@@ -134,106 +132,42 @@ fun rememberCarouselState(initialItem: Int = 0, itemCount: () -> Int): CarouselS
 @Composable
 fun RoundedHorizontalMultiBrowseCarousel(
     state: CarouselState,
+    preferredItemWidth: Dp,
     modifier: Modifier = Modifier,
     itemSpacing: Dp = 0.dp,
-    flingBehavior: TargetedFlingBehavior = PagerDefaults.flingBehavior(
-        state = state.pagerState,
-        pagerSnapDistance = PagerSnapDistance.atMost(1)
-    ),
+    flingBehavior: TargetedFlingBehavior =
+        PagerDefaults.flingBehavior(state = state.pagerState, pagerSnapDistance = PagerSnapDistance.atMost(1)),
     userScrollEnabled: Boolean = true,
+    minSmallItemWidth: Dp = 40.dp,
+    maxSmallItemWidth: Dp = 56.dp,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     itemCornerRadius: Dp = 16.dp,
-    carouselStyle: String,
-    carouselWidth: Dp,
     content: @Composable CarouselItemScope.(itemIndex: Int) -> Unit,
 ) {
     val density = LocalDensity.current
-    val carouselWidthPx = with(density) { carouselWidth.toPx() }
-
-    val maxNonFocalItems = when (carouselStyle) {
-        CarouselStyle.NO_PEEK -> 0
-        CarouselStyle.ONE_PEEK -> 1
-        CarouselStyle.TWO_PEEK -> 2
-        else -> 1 // Default to one peek
-    }
-
-    val maxNonFocalItems = when (carouselStyle) {
-        CarouselStyle.NO_PEEK -> 0
-        CarouselStyle.ONE_PEEK -> 1
-        CarouselStyle.TWO_PEEK -> 2
-        else -> 1 // Default to one peek
-    }
-    val isScrollEnabled = carouselStyle != CarouselStyle.NO_PEEK
-
     RoundedCarousel(
         state = state,
         orientation = Orientation.Horizontal,
-        keylineList = { _, spacingPx ->
-            val itemCount = state.pagerState.pageCountState.value.invoke()
-            when (carouselStyle) {
-                CarouselStyle.NO_PEEK -> multiBrowseKeylineList(
-                    density = density,
-                    carouselMainAxisSize = carouselWidthPx,
-                    preferredItemSize = carouselWidthPx,
+        keylineList = { space, spacingPx ->
+            with(density) {
+                multiBrowseKeylineList(
+                    density = this,
+                    carouselMainAxisSize = space,
+                    preferredItemSize = preferredItemWidth.toPx(),
                     itemSpacing = spacingPx,
-                    itemCount = itemCount,
-                    largeCounts = intArrayOf(1),
-                    mediumCounts = intArrayOf(0),
-                    smallCounts = intArrayOf(0)
-                )
-                CarouselStyle.ONE_PEEK -> multiBrowseKeylineList(
-                    density = density,
-                    carouselMainAxisSize = carouselWidthPx,
-                    preferredItemSize = carouselWidthPx * 0.8f,
-                    itemSpacing = spacingPx,
-                    itemCount = itemCount,
-                    alignment = CarouselAlignment.Start,
-                    largeCounts = intArrayOf(1),
-                    mediumCounts = intArrayOf(0),
-                    smallCounts = intArrayOf(1)
-                )
-                CarouselStyle.TWO_PEEK -> {
-                    if (state.pagerState.currentPage == 0) {
-                        multiBrowseKeylineList(
-                            density = density,
-                            carouselMainAxisSize = carouselWidthPx,
-                            preferredItemSize = carouselWidthPx * 0.8f,
-                            itemSpacing = spacingPx,
-                            itemCount = itemCount,
-                            alignment = CarouselAlignment.Start,
-                            largeCounts = intArrayOf(1),
-                            mediumCounts = intArrayOf(0),
-                            smallCounts = intArrayOf(1)
-                        )
-                    } else {
-                        multiBrowseKeylineList(
-                            density = density,
-                            carouselMainAxisSize = carouselWidthPx,
-                            preferredItemSize = carouselWidthPx * 0.8f,
-                            itemSpacing = spacingPx,
-                            itemCount = itemCount,
-                            smallCounts = intArrayOf(2),
-                            alignment = CarouselAlignment.Center
-                        )
-                    }
-                }
-                else -> multiBrowseKeylineList( // Default to one peek
-                    density = density,
-                    carouselMainAxisSize = carouselWidthPx,
-                    preferredItemSize = carouselWidthPx * 0.8f,
-                    itemSpacing = spacingPx,
-                    itemCount = itemCount,
-                    alignment = CarouselAlignment.Start
+                    itemCount = state.pagerState.pageCountState.value.invoke(),
+                    minSmallItemSize = minSmallItemWidth.toPx(),
+                    maxSmallItemSize = maxSmallItemWidth.toPx()
                 )
             }
         },
-        contentPadding = PaddingValues(0.dp),
-        maxNonFocalVisibleItemCount = maxNonFocalItems,
+        contentPadding = contentPadding,
+        maxNonFocalVisibleItemCount = 2,
         modifier = modifier,
         itemSpacing = itemSpacing,
         flingBehavior = flingBehavior,
-        userScrollEnabled = isScrollEnabled,
+        userScrollEnabled = userScrollEnabled,
         itemCornerRadius = itemCornerRadius,
-        carouselStyle = carouselStyle, // Pass style down
         content = content
     )
 }
@@ -255,7 +189,6 @@ private fun RoundedCarousel(
     flingBehavior: TargetedFlingBehavior,
     userScrollEnabled: Boolean,
     itemCornerRadius: Dp,
-    carouselStyle: String,
     content: @Composable CarouselItemScope.(itemIndex: Int) -> Unit,
 ) {
     val beforeContentPadding = contentPadding.calculateBeforeContentPadding(orientation)
@@ -336,8 +269,7 @@ private fun RoundedCarousel(
                 state = state,
                 strategy = { pageSize.strategy },
                 carouselItemDrawInfo = carouselItemInfo,
-                clipShape = clipShape,
-                carouselStyle = carouselStyle
+                clipShape = clipShape
             )
         ) {
             scope.content(page)
@@ -454,19 +386,7 @@ private fun Modifier.carouselItem(
     strategy: () -> Strategy,
     carouselItemDrawInfo: CarouselItemDrawInfoImpl,
     clipShape: Shape,
-    carouselStyle: String,
-): Modifier = composed {
-    val animatedAlpha by animateFloatAsState(
-        targetValue = when (carouselStyle) {
-            CarouselStyle.ONE_PEEK -> if (index > state.pagerState.currentPage + 1) 0f else 1f
-            CarouselStyle.TWO_PEEK -> if (index < state.pagerState.currentPage - 1 || index > state.pagerState.currentPage + 1) 0f else 1f
-            else -> 1f
-        },
-        animationSpec = tween(durationMillis = 200),
-        label = "AlphaAnimation"
-    )
-
-    layout { measurable, constraints ->
+): Modifier = layout { measurable, constraints ->
     val strategyResult = strategy()
     if (!strategyResult.isValid) return@layout layout(0, 0) {}
 
@@ -560,9 +480,6 @@ private fun Modifier.carouselItem(
             // --- CLIP: siempre activado con la forma redondeada
             clip = true
             shape = clipShape
-
-            // --- ALPHA: oculta items extra en modo ONE_PEEK
-            alpha = animatedAlpha
 
             // --- traslación final (pegado de bordes)
             var translation = ik.offset - unadjustedCenter
@@ -870,27 +787,23 @@ private fun multiBrowseKeylineList(
     itemCount: Int,
     minSmallItemSize: Float = with(density) { 40.dp.toPx() },
     maxSmallItemSize: Float = with(density) { 56.dp.toPx() },
-    largeCounts: IntArray? = null,
-    mediumCounts: IntArray = intArrayOf(1, 0),
-    smallCounts: IntArray = intArrayOf(1),
-    alignment: CarouselAlignment = CarouselAlignment.Start
 ): KeylineList {
     if (carouselMainAxisSize == 0f || preferredItemSize == 0f) return emptyKeylineList()
 
-    var resolvedSmallCounts = smallCounts
+    var smallCounts: IntArray = intArrayOf(1)
+    val mediumCounts: IntArray = intArrayOf(1, 0)
+
     val targetLargeSize = min(preferredItemSize, carouselMainAxisSize)
     val targetSmallSize = (targetLargeSize / 3f).coerceIn(minSmallItemSize, maxSmallItemSize)
     val targetMediumSize = (targetLargeSize + targetSmallSize) / 2f
 
-    if (carouselMainAxisSize < minSmallItemSize * 2) resolvedSmallCounts = intArrayOf(0)
+    if (carouselMainAxisSize < minSmallItemSize * 2) smallCounts = intArrayOf(0)
 
-    val resolvedLargeCounts = largeCounts ?: run {
-        val minAvailableLargeSpace =
-            carouselMainAxisSize - targetMediumSize * mediumCounts.max() - maxSmallItemSize * resolvedSmallCounts.max()
-        val minLargeCount = max(1, floor(minAvailableLargeSpace / targetLargeSize).toInt())
-        val maxLargeCount = ceil(carouselMainAxisSize / targetLargeSize).toInt()
-        IntArray(maxLargeCount - minLargeCount + 1) { maxLargeCount - it }
-    }
+    val minAvailableLargeSpace =
+        carouselMainAxisSize - targetMediumSize * mediumCounts.max() - maxSmallItemSize * smallCounts.max()
+    val minLargeCount = max(1, floor(minAvailableLargeSpace / targetLargeSize).toInt())
+    val maxLargeCount = ceil(carouselMainAxisSize / targetLargeSize).toInt()
+    val largeCounts = IntArray(maxLargeCount - minLargeCount + 1) { maxLargeCount - it }
     val anchorSize = with(density) { 10.dp.toPx() }
 
     var arrangement =
@@ -900,11 +813,11 @@ private fun multiBrowseKeylineList(
             targetSmallSize = targetSmallSize,
             minSmallSize = minSmallItemSize,
             maxSmallSize = maxSmallItemSize,
-            smallCounts = resolvedSmallCounts,
+            smallCounts = smallCounts,
             targetMediumSize = targetMediumSize,
             mediumCounts = mediumCounts,
             targetLargeSize = targetLargeSize,
-            largeCounts = resolvedLargeCounts,
+            largeCounts = largeCounts,
         ) ?: return emptyKeylineList()
 
     if (arrangement.itemCount() > itemCount) {
@@ -926,41 +839,31 @@ private fun multiBrowseKeylineList(
                 targetMediumSize = targetMediumSize,
                 mediumCounts = intArrayOf(mc),
                 targetLargeSize = targetLargeSize,
-                largeCounts = resolvedLargeCounts,
+                largeCounts = largeCounts,
             ) ?: arrangement
     }
 
-    return createKeylineListFromArrangement(
+    return createLeftAlignedKeylineList(
         carouselMainAxisSize = carouselMainAxisSize,
         itemSpacing = itemSpacing,
         leftAnchorSize = anchorSize,
         rightAnchorSize = anchorSize,
-        arrangement = arrangement,
-        alignment = alignment
+        arrangement = arrangement
     )
 }
 
-private fun createKeylineListFromArrangement(
+private fun createLeftAlignedKeylineList(
     carouselMainAxisSize: Float,
     itemSpacing: Float,
     leftAnchorSize: Float,
     rightAnchorSize: Float,
     arrangement: Arrangement,
-    alignment: CarouselAlignment
 ): KeylineList {
-    return keylineListOf(carouselMainAxisSize, itemSpacing, alignment) {
+    return keylineListOf(carouselMainAxisSize, itemSpacing, CarouselAlignment.Start) {
         add(leftAnchorSize, isAnchor = true)
-        if (alignment == CarouselAlignment.Center && arrangement.smallCount == 2 && arrangement.largeCount == 1) {
-            // Symmetrical layout for Two Peeks: [small, large, small]
-            add(arrangement.smallSize)
-            add(arrangement.largeSize)
-            add(arrangement.smallSize)
-        } else {
-            // Default layout for One Peek and No Peek
-            repeat(arrangement.largeCount) { add(arrangement.largeSize) }
-            repeat(arrangement.mediumCount) { add(arrangement.mediumSize) }
-            repeat(arrangement.smallCount) { add(arrangement.smallSize) }
-        }
+        repeat(arrangement.largeCount) { add(arrangement.largeSize) }
+        repeat(arrangement.mediumCount) { add(arrangement.mediumSize) }
+        repeat(arrangement.smallCount) { add(arrangement.smallSize) }
         add(rightAnchorSize, isAnchor = true)
     }
 }
