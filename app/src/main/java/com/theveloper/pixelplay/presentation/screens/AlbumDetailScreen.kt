@@ -210,7 +210,7 @@ fun AlbumDetailScreen(
                                 playerViewModel.selectSongForInfo(song)
                                 showSongInfoBottomSheet = true
                             },
-                            onClick = { playerViewModel.showAndPlaySong(song, songs) }
+                            onClick = { playerViewModel.showAndPlaySong(song, songs, album.title) }
                         )
                     }
                 }
@@ -223,7 +223,7 @@ fun AlbumDetailScreen(
                     onPlayClick = {
                         if (songs.isNotEmpty()) {
                             val randomSong = songs.random()
-                            playerViewModel.showAndPlaySong(randomSong, songs)
+                            playerViewModel.showAndPlaySong(randomSong, songs, album.title)
                         }
                     }
                 )
