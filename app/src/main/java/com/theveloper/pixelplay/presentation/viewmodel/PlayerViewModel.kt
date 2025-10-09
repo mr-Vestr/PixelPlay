@@ -1236,26 +1236,28 @@ class PlayerViewModel @Inject constructor(
         isVoluntaryPlay: Boolean = true
     ) {
         val castSession = _castSession.value
+        val currentQueueName = _playerUiState.value.currentQueueSourceName
+
         if (castSession != null && castSession.remoteMediaClient != null) {
             val remoteMediaClient = castSession.remoteMediaClient!!
             val remoteQueueItems = remoteMediaClient.mediaStatus?.queueItems ?: emptyList()
             val itemInQueue = remoteQueueItems.find { it.customData?.optString("songId") == song.id }
 
-            if (itemInQueue != null) {
-                // Song is already in the remote queue, just jump to it.
+            // If the context is different OR the song isn't in the current remote queue, start a new playback.
+            if (queueName != currentQueueName || itemInQueue == null) {
+                if (isVoluntaryPlay) incrementSongScore(song.id)
+                playSongs(contextSongs, song, queueName, null)
+            } else {
+                // The context is the same and the song is in the queue, just jump to it.
                 remoteMediaClient.queueJumpToItem(itemInQueue.itemId, 0L, null).setResultCallback {
                     if (!it.status.isSuccess) {
                         Timber.e("Remote media client failed to jump to item: ${it.status.statusMessage}")
-                        // If jumping fails, fall back to reloading the queue
+                        // If jumping fails, fall back to reloading the queue as a safety measure.
                         playSongs(contextSongs, song, queueName, null)
                     } else {
                         if (isVoluntaryPlay) incrementSongScore(song.id)
                     }
                 }
-            } else {
-                // Song not in remote queue, so start a new playback session.
-                if (isVoluntaryPlay) incrementSongScore(song.id)
-                playSongs(contextSongs, song, queueName, null)
             }
         } else {
             // Local playback logic
@@ -1263,7 +1265,12 @@ class PlayerViewModel @Inject constructor(
                 val currentQueue = _playerUiState.value.currentPlaybackQueue
                 val songIndexInQueue = currentQueue.indexOfFirst { it.id == song.id }
 
-                if (songIndexInQueue != -1) {
+                // If the context is different OR the song isn't in the current local queue, start a new playback.
+                if (queueName != currentQueueName || songIndexInQueue == -1) {
+                    if (isVoluntaryPlay) incrementSongScore(song.id)
+                    playSongs(contextSongs, song, queueName, null)
+                } else {
+                    // The context is the same and the song is in the queue, just seek or play.
                     if (controller.currentMediaItemIndex == songIndexInQueue) {
                         if (!controller.isPlaying) controller.play()
                     } else {
@@ -1271,9 +1278,6 @@ class PlayerViewModel @Inject constructor(
                         controller.play()
                     }
                     if (isVoluntaryPlay) incrementSongScore(song.id)
-                } else {
-                    if (isVoluntaryPlay) incrementSongScore(song.id)
-                    playSongs(contextSongs, song, queueName, null)
                 }
             }
         }
