@@ -27,7 +27,10 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.theveloper.pixelplay.R
 import com.theveloper.pixelplay.data.model.Song
+import com.theveloper.pixelplay.utils.shapes.CloverShape
+import com.theveloper.pixelplay.utils.shapes.GemShape
 import com.theveloper.pixelplay.utils.shapes.RoundedStarShape
+import com.theveloper.pixelplay.utils.shapes.TicketShape
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +38,48 @@ import kotlinx.coroutines.withContext
 
 @Stable
 data class Config(val size: Dp, val width: Dp, val height: Dp, val align: Alignment, val rot: Float, val shape: Shape, val offsetX: Dp, val offsetY: Dp)
+
+@Composable
+private fun rememberCollagePatterns(height: Dp, boxMaxHeight: Dp): List<List<Config>> {
+    return remember(height, boxMaxHeight) {
+        val min = minOf(300.dp, height)
+
+        val pattern1 = listOf(
+            Config(size = min * 0.8f, width = min * 0.48f, height = min * 0.8f, align = Alignment.Center, rot = 45f, shape = RoundedCornerShape(percent = 50), offsetX = 0.dp, offsetY = 0.dp),
+            Config(size = min * 0.4f, width = min * 0.24f, height = min * 0.24f, align = Alignment.TopStart, rot = 0f, shape = CircleShape, offsetX = (300.dp * 0.05f), offsetY = (boxMaxHeight * 0.05f)),
+            Config(size = min * 0.4f, width = min * 0.24f, height = min * 0.24f, align = Alignment.BottomEnd, rot = 0f, shape = CircleShape, offsetX = -(300.dp * 0.05f), offsetY = -(boxMaxHeight * 0.05f)),
+            Config(size = min * 0.6f, width = min * 0.35f, height = min * 0.35f, align = Alignment.TopStart, rot = -20f, shape = RoundedCornerShape(20.dp), offsetX = (300.dp * 0.1f), offsetY = (boxMaxHeight * 0.1f)),
+            Config(size = min * 0.9f, width = min * 0.9f, height = min * 0.9f, align = Alignment.BottomEnd, rot = 0f, shape = RoundedStarShape(sides = 6, curve = 0.09, rotation = 45f), offsetX = (42).dp, offsetY = 0.dp)
+        )
+
+        val pattern2 = listOf(
+            Config(size = min * 0.6f, width = min * 0.6f, height = min * 0.6f, align = Alignment.Center, rot = 0f, shape = CloverShape(), offsetX = 0.dp, offsetY = 0.dp),
+            Config(size = min * 0.5f, width = min * 0.5f, height = min * 0.5f, align = Alignment.TopStart, rot = -15f, shape = RoundedStarShape(8, 0.2f), offsetX = (min * 0.1f), offsetY = (boxMaxHeight * 0.1f)),
+            Config(size = min * 0.4f, width = min * 0.4f, height = min * 0.4f, align = Alignment.TopEnd, rot = 15f, shape = RoundedCornerShape(30.dp), offsetX = -(min * 0.1f), offsetY = (boxMaxHeight * 0.1f)),
+            Config(size = min * 0.45f, width = min * 0.45f, height = min * 0.45f, align = Alignment.BottomStart, rot = 15f, shape = CircleShape, offsetX = (min * 0.15f), offsetY = -(boxMaxHeight * 0.15f)),
+            Config(size = min * 0.55f, width = min * 0.55f, height = min * 0.55f, align = Alignment.BottomEnd, rot = -15f, shape = RoundedStarShape(5, 0.3f), offsetX = -(min * 0.1f), offsetY = -(boxMaxHeight * 0.1f))
+        )
+
+        val pattern3 = listOf(
+            Config(size = min * 0.7f, width = min * 0.7f, height = min * 0.7f, align = Alignment.Center, rot = 10f, shape = GemShape(), offsetX = 0.dp, offsetY = 0.dp),
+            Config(size = min * 0.4f, width = min * 0.25f, height = min * 0.4f, align = Alignment.TopEnd, rot = -10f, shape = TicketShape(20f), offsetX = -(min * 0.1f), offsetY = (boxMaxHeight * 0.15f)),
+            Config(size = min * 0.4f, width = min * 0.25f, height = min * 0.4f, align = Alignment.BottomStart, rot = -10f, shape = TicketShape(20f), offsetX = (min * 0.1f), offsetY = -(boxMaxHeight * 0.15f)),
+            Config(size = min * 0.5f, width = min * 0.5f, height = min * 0.5f, align = Alignment.TopStart, rot = 25f, shape = RoundedStarShape(4, 0.1f, rotation = 45f), offsetX = (min * 0.05f), offsetY = (boxMaxHeight * 0.05f)),
+            Config(size = min * 0.5f, width = min * 0.5f, height = min * 0.5f, align = Alignment.BottomEnd, rot = 25f, shape = RoundedStarShape(4, 0.1f, rotation = 45f), offsetX = -(min * 0.05f), offsetY = -(boxMaxHeight * 0.05f))
+        )
+
+        val pattern4 = listOf(
+            Config(size = min * 0.5f, width = min * 0.5f, height = min * 0.5f, align = Alignment.TopStart, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = (min * 0.1f), offsetY = (boxMaxHeight * 0.1f)),
+            Config(size = min * 0.5f, width = min * 0.5f, height = min * 0.5f, align = Alignment.TopEnd, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = -(min * 0.1f), offsetY = (boxMaxHeight * 0.1f)),
+            Config(size = min * 0.5f, width = min * 0.5f, height = min * 0.5f, align = Alignment.BottomStart, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = (min * 0.1f), offsetY = -(boxMaxHeight * 0.1f)),
+            Config(size = min * 0.5f, width = min * 0.5f, height = min * 0.5f, align = Alignment.BottomEnd, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = -(min * 0.1f), offsetY = -(boxMaxHeight * 0.1f)),
+            Config(size = min * 0.4f, width = min * 0.4f, height = min * 0.4f, align = Alignment.Center, rot = 45f, shape = RoundedCornerShape(12.dp), offsetX = 0.dp, offsetY = 0.dp)
+        )
+
+        listOf(pattern1, pattern2, pattern3, pattern4)
+    }
+}
+
 
 /**
  * Muestra hasta 6 portadas en un layout de collage con formas simplificadas y redondeadas.
@@ -63,7 +108,6 @@ fun AlbumArtCollage(
                     .data(it)
                     .dispatcher(Dispatchers.IO)
                     .crossfade(true)
-                    //.placeholder(R.drawable.rounded_album_24)
                     .error(R.drawable.rounded_album_24)
                     .build()
             }
@@ -77,64 +121,38 @@ fun AlbumArtCollage(
             .padding(padding)
     ) {
         val boxMaxHeight = maxHeight
-        val shapeConfigs by produceState<List<Config>>(initialValue = emptyList(), songsToShow, boxMaxHeight) {
+        val collagePatterns = rememberCollagePatterns(height = height, boxMaxHeight = boxMaxHeight)
+        val randomPattern = remember { collagePatterns.random() }
+
+        val shapeConfigs by produceState<List<Config>>(initialValue = emptyList(), randomPattern) {
             value = withContext(Dispatchers.Default) {
-                val min = minOf(300.dp, height)
-                listOf(
-                    Config(size = min * 0.8f, width = min * 0.48f, height = min * 0.8f, align = Alignment.Center, rot = 45f, shape = RoundedCornerShape(percent = 50), offsetX = 0.dp, offsetY = 0.dp),
-                    Config(size = min * 0.4f, width = min * 0.24f, height = min * 0.24f, align = Alignment.TopStart, rot = 0f, shape = CircleShape, offsetX = (300.dp * 0.05f), offsetY = (boxMaxHeight * 0.05f)),
-                    Config(size = min * 0.4f, width = min * 0.24f, height = min * 0.24f, align = Alignment.BottomEnd, rot = 0f, shape = CircleShape, offsetX = -(300.dp * 0.05f), offsetY = -(boxMaxHeight * 0.05f)),
-                    Config(size = min * 0.6f, width = min * 0.35f, height = min * 0.35f, align = Alignment.TopStart, rot = -20f, shape = RoundedCornerShape(20.dp), offsetX = (300.dp * 0.1f), offsetY = (boxMaxHeight * 0.1f)),
-                    Config(size = min * 0.9f, width = min * 0.9f, height = min * 0.9f, align = Alignment.BottomEnd, rot = 0f, shape = RoundedStarShape(sides = 6, curve = 0.09, rotation = 45f), offsetX = (42).dp, offsetY = 0.dp)
-                )
+                randomPattern
             }
         }
 
         if (shapeConfigs.isNotEmpty()) {
-            val (topConfigs, bottomConfigs) = shapeConfigs.take(3) to shapeConfigs.drop(3)
-
-            Column(Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxWidth().height(boxMaxHeight * 0.6f)) {
-                    topConfigs.forEachIndexed { idx, cfg ->
-                        songsToShow.getOrNull(idx)?.let { song ->
-                            AsyncImage(
-                                model = requests[idx],
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .size(cfg.width, cfg.height)
-                                    .align(cfg.align)
-                                    .offset(cfg.offsetX, cfg.offsetY)
-                                    .graphicsLayer { rotationZ = cfg.rot }
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null
-                                    ) { onSongClick(song) }
-                                    .background(shape = cfg.shape, color = MaterialTheme.colorScheme.surfaceContainerHigh)
-                                    .clip(cfg.shape)
-                            )
-                        }
-                    }
-                }
-                Box(Modifier.fillMaxWidth().height(boxMaxHeight * 0.4f)) {
-                    bottomConfigs.forEachIndexed { j, cfg ->
-                        songsToShow.getOrNull(j + 3)?.let { song ->
-                            AsyncImage(
-                                model = requests[j + 3],
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .size(cfg.width, cfg.height)
-                                    .align(cfg.align)
-                                    .offset(cfg.offsetX, cfg.offsetY)
-                                    .graphicsLayer { rotationZ = cfg.rot }
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null
-                                    ) { onSongClick(song) }
-                                    .clip(cfg.shape)
-                            )
-                        }
+            Box(Modifier.fillMaxSize()) {
+                shapeConfigs.forEachIndexed { idx, cfg ->
+                    songsToShow.getOrNull(idx)?.let { song ->
+                        AsyncImage(
+                            model = requests.getOrNull(idx),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(cfg.width, cfg.height)
+                                .align(cfg.align)
+                                .offset(cfg.offsetX, cfg.offsetY)
+                                .graphicsLayer { rotationZ = cfg.rot }
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) { onSongClick(song) }
+                                .background(
+                                    shape = cfg.shape,
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                                .clip(cfg.shape)
+                        )
                     }
                 }
             }
