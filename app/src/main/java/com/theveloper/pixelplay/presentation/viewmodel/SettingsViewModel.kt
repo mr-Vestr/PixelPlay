@@ -22,7 +22,8 @@ data class SettingsUiState(
     val mockGenresEnabled: Boolean = false,
     val navBarCornerRadius: Int = 32,
     val navBarStyle: String = NavBarStyle.DEFAULT,
-    val carouselStyle: String = CarouselStyle.ONE_PEEK
+    val carouselStyle: String = CarouselStyle.ONE_PEEK,
+    val collagePattern: String = "random"
 )
 
 @HiltViewModel
@@ -66,6 +67,12 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferencesRepository.carouselStyleFlow.collect { style ->
                 _uiState.update { it.copy(carouselStyle = style) }
+            }
+        }
+
+        viewModelScope.launch {
+            userPreferencesRepository.collagePatternFlow.collect { pattern ->
+                _uiState.update { it.copy(collagePattern = pattern) }
             }
         }
 
@@ -140,6 +147,12 @@ class SettingsViewModel @Inject constructor(
     fun setCarouselStyle(style: String) {
         viewModelScope.launch {
             userPreferencesRepository.setCarouselStyle(style)
+        }
+    }
+
+    fun setCollagePattern(pattern: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setCollagePattern(pattern)
         }
     }
 }

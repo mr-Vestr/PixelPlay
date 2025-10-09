@@ -63,6 +63,7 @@ class UserPreferencesRepository @Inject constructor(
         val NAV_BAR_CORNER_RADIUS = intPreferencesKey("nav_bar_corner_radius")
         val NAV_BAR_STYLE = stringPreferencesKey("nav_bar_style")
         val CAROUSEL_STYLE = stringPreferencesKey("carousel_style")
+        val COLLAGE_PATTERN = stringPreferencesKey("collage_pattern")
 
         // Transition Settings
         val GLOBAL_TRANSITION_SETTINGS = stringPreferencesKey("global_transition_settings_json")
@@ -391,6 +392,17 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun resetLibraryTabsOrder() {
         dataStore.edit { preferences ->
             preferences.remove(PreferencesKeys.LIBRARY_TABS_ORDER)
+        }
+    }
+
+    val collagePatternFlow: Flow<String> = dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.COLLAGE_PATTERN] ?: "random"
+        }
+
+    suspend fun setCollagePattern(pattern: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.COLLAGE_PATTERN] = pattern
         }
     }
 }

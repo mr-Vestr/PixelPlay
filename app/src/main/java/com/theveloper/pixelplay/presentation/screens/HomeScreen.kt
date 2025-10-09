@@ -58,7 +58,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavController
 import com.theveloper.pixelplay.R
 import com.theveloper.pixelplay.data.model.Song
-import com.theveloper.pixelplay.presentation.components.AlbumArtCollage
+import com.theveloper.pixelplay.presentation.components.AlbumTangramCollage
 import com.theveloper.pixelplay.presentation.components.DailyMixSection
 import com.theveloper.pixelplay.presentation.components.HomeGradientTopBar
 import com.theveloper.pixelplay.presentation.components.HomeOptionsBottomSheet
@@ -68,6 +68,7 @@ import com.theveloper.pixelplay.presentation.components.SmartImage
 import com.theveloper.pixelplay.presentation.components.subcomps.PlayingEqIcon
 import com.theveloper.pixelplay.presentation.navigation.Screen
 import com.theveloper.pixelplay.presentation.viewmodel.PlayerViewModel
+import com.theveloper.pixelplay.presentation.viewmodel.SettingsViewModel
 import com.theveloper.pixelplay.ui.theme.ExpTitleTypography
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.map
@@ -81,8 +82,12 @@ import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 fun HomeScreen(
     navController: NavController,
     paddingValuesParent: PaddingValues,
-    playerViewModel: PlayerViewModel = hiltViewModel()
+    playerViewModel: PlayerViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val settingsUiState by settingsViewModel.uiState.collectAsState()
+    val collagePattern = settingsUiState.collagePattern
+
     // 1) Observar sólo la lista de canciones, que cambia con poca frecuencia
     val allSongs by playerViewModel.allSongsFlow.collectAsState(initial = emptyList())
     val dailyMixSongs by playerViewModel.dailyMixSongs.collectAsState()
@@ -154,11 +159,13 @@ fun HomeScreen(
                 // Collage
                 if (yourMixSongs.isNotEmpty()) {
                     item(key = "album_art_collage") {
-                        AlbumArtCollage(
-                            modifier = Modifier.fillMaxWidth(),
+                        AlbumTangramCollage(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(400.dp)
+                                .padding(horizontal = 14.dp),
                             songs = yourMixSongs,
-                            padding = 14.dp,
-                            height = 400.dp,
+                            patternName = collagePattern,
                             onSongClick = { song ->
                                 playerViewModel.showAndPlaySong(song, yourMixSongs, "Your Mix")
                             }

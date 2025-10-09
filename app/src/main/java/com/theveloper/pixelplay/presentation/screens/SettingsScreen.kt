@@ -457,6 +457,27 @@ fun SettingsScreen(
                                 )
                             }
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        ThemeSelectorItem(
+                            label = "Collage Pattern",
+                            description = "Choose the pattern for the album collage on the home screen.",
+                            options = mapOf(
+                                "random" to "Random",
+                                "homescreen" to "Inspired",
+                                "symmetrical" to "Symmetrical",
+                                "dynamic_flow" to "Dynamic Flow",
+                                "expressive" to "Expressive"
+                            ),
+                            selectedKey = uiState.collagePattern,
+                            onSelectionChanged = { settingsViewModel.setCollagePattern(it) },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.rounded_auto_awesome_mosaic_24),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        )
                     }
                 }
             }
