@@ -44,40 +44,40 @@ private fun rememberCollagePatterns(height: Dp, boxMaxHeight: Dp): List<List<Con
     return remember(height, boxMaxHeight) {
         val min = minOf(300.dp, height)
 
-        // Original pattern, adapted for single Box layout with proper spacing
+        // Original pattern with guaranteed spacing
         val pattern1 = listOf(
-            Config(size = min * 0.8f, width = min * 0.48f, height = min * 0.8f, align = Alignment.Center, rot = 45f, shape = RoundedCornerShape(percent = 50), offsetX = 0.dp, offsetY = 0.dp),
-            Config(size = min * 0.4f, width = min * 0.24f, height = min * 0.24f, align = Alignment.TopStart, rot = 0f, shape = CircleShape, offsetX = (min * 0.1f), offsetY = (boxMaxHeight * 0.1f)),
-            Config(size = min * 0.4f, width = min * 0.24f, height = min * 0.24f, align = Alignment.BottomEnd, rot = 0f, shape = CircleShape, offsetX = -(min * 0.1f), offsetY = -(boxMaxHeight * 0.1f)),
-            Config(size = min * 0.6f, width = min * 0.35f, height = min * 0.35f, align = Alignment.TopEnd, rot = -20f, shape = RoundedCornerShape(20.dp), offsetX = -(min * 0.2f), offsetY = (boxMaxHeight * 0.15f)),
-            Config(size = min * 0.9f, width = min * 0.9f, height = min * 0.9f, align = Alignment.BottomStart, rot = 0f, shape = RoundedStarShape(sides = 6, curve = 0.09, rotation = 45f), offsetX = (min*0.15f), offsetY = -(boxMaxHeight*0.15f))
+            Config(size = min * 0.7f, width = min * 0.4f, height = min * 0.7f, align = Alignment.Center, rot = 45f, shape = RoundedCornerShape(percent = 50), offsetX = 0.dp, offsetY = 0.dp),
+            Config(size = min * 0.35f, width = min * 0.35f, height = min * 0.35f, align = Alignment.TopStart, rot = 0f, shape = CircleShape, offsetX = (min * 0.2f), offsetY = (boxMaxHeight * 0.2f)),
+            Config(size = min * 0.35f, width = min * 0.35f, height = min * 0.35f, align = Alignment.BottomEnd, rot = 0f, shape = CircleShape, offsetX = -(min * 0.2f), offsetY = -(boxMaxHeight * 0.2f)),
+            Config(size = min * 0.4f, width = min * 0.3f, height = min * 0.3f, align = Alignment.TopEnd, rot = -20f, shape = RoundedCornerShape(20.dp), offsetX = -(min * 0.3f), offsetY = (boxMaxHeight * 0.25f)),
+            Config(size = min * 0.5f, width = min * 0.5f, height = min * 0.5f, align = Alignment.BottomStart, rot = 0f, shape = RoundedStarShape(sides = 6, curve = 0.09, rotation = 45f), offsetX = (min * 0.25f), offsetY = -(boxMaxHeight * 0.25f))
         )
 
-        // New pattern with Clover shape and adjusted spacing
+        // Clover pattern with guaranteed spacing
         val pattern2 = listOf(
-            Config(size = min * 0.6f, width = min * 0.6f, height = min * 0.6f, align = Alignment.Center, rot = 0f, shape = CloverShape(), offsetX = 0.dp, offsetY = 0.dp),
-            Config(size = min * 0.4f, width = min * 0.4f, height = min * 0.4f, align = Alignment.TopStart, rot = -15f, shape = RoundedStarShape(8, 0.2f), offsetX = (min * 0.2f), offsetY = (boxMaxHeight * 0.15f)),
-            Config(size = min * 0.35f, width = min * 0.35f, height = min * 0.35f, align = Alignment.TopEnd, rot = 15f, shape = RoundedCornerShape(30.dp), offsetX = -(min * 0.25f), offsetY = (boxMaxHeight * 0.2f)),
-            Config(size = min * 0.35f, width = min * 0.35f, height = min * 0.35f, align = Alignment.BottomStart, rot = 15f, shape = CircleShape, offsetX = (min * 0.25f), offsetY = -(boxMaxHeight * 0.2f)),
-            Config(size = min * 0.4f, width = min * 0.4f, height = min * 0.4f, align = Alignment.BottomEnd, rot = -15f, shape = RoundedStarShape(5, 0.3f), offsetX = -(min * 0.2f), offsetY = -(boxMaxHeight * 0.15f))
+            Config(size = min * 0.5f, width = min * 0.5f, height = min * 0.5f, align = Alignment.Center, rot = 0f, shape = CloverShape(), offsetX = 0.dp, offsetY = 0.dp),
+            Config(size = min * 0.4f, width = min * 0.4f, height = min * 0.4f, align = Alignment.TopStart, rot = -15f, shape = RoundedStarShape(8, 0.2f), offsetX = (min * 0.3f), offsetY = (boxMaxHeight * 0.25f)),
+            Config(size = min * 0.35f, width = min * 0.35f, height = min * 0.35f, align = Alignment.TopEnd, rot = 15f, shape = RoundedCornerShape(30.dp), offsetX = -(min * 0.3f), offsetY = (boxMaxHeight * 0.25f)),
+            Config(size = min * 0.35f, width = min * 0.35f, height = min * 0.35f, align = Alignment.BottomStart, rot = 15f, shape = CircleShape, offsetX = (min * 0.3f), offsetY = -(boxMaxHeight * 0.25f)),
+            Config(size = min * 0.4f, width = min * 0.4f, height = min * 0.4f, align = Alignment.BottomEnd, rot = -15f, shape = RoundedStarShape(5, 0.3f), offsetX = -(min * 0.3f), offsetY = -(boxMaxHeight * 0.25f))
         )
 
-        // New pattern with Gem and Ticket shapes and adjusted spacing
+        // Gem and Ticket pattern with guaranteed spacing
         val pattern3 = listOf(
-            Config(size = min * 0.65f, width = min * 0.65f, height = min * 0.65f, align = Alignment.Center, rot = 10f, shape = GemShape(), offsetX = 0.dp, offsetY = 0.dp),
-            Config(size = min * 0.4f, width = min * 0.25f, height = min * 0.4f, align = Alignment.TopEnd, rot = -10f, shape = TicketShape(20f), offsetX = -(min * 0.2f), offsetY = (boxMaxHeight * 0.2f)),
-            Config(size = min * 0.4f, width = min * 0.25f, height = min * 0.4f, align = Alignment.BottomStart, rot = -10f, shape = TicketShape(20f), offsetX = (min * 0.2f), offsetY = -(boxMaxHeight * 0.2f)),
-            Config(size = min * 0.45f, width = min * 0.45f, height = min * 0.45f, align = Alignment.TopStart, rot = 25f, shape = RoundedStarShape(4, 0.1f, rotation = 45f), offsetX = (min * 0.1f), offsetY = (boxMaxHeight * 0.1f)),
-            Config(size = min * 0.45f, width = min * 0.45f, height = min * 0.45f, align = Alignment.BottomEnd, rot = 25f, shape = RoundedStarShape(4, 0.1f, rotation = 45f), offsetX = -(min * 0.1f), offsetY = -(boxMaxHeight * 0.1f))
+            Config(size = min * 0.55f, width = min * 0.55f, height = min * 0.55f, align = Alignment.Center, rot = 10f, shape = GemShape(), offsetX = 0.dp, offsetY = 0.dp),
+            Config(size = min * 0.4f, width = min * 0.25f, height = min * 0.4f, align = Alignment.TopEnd, rot = -10f, shape = TicketShape(20f), offsetX = -(min * 0.35f), offsetY = (boxMaxHeight * 0.2f)),
+            Config(size = min * 0.4f, width = min * 0.25f, height = min * 0.4f, align = Alignment.BottomStart, rot = -10f, shape = TicketShape(20f), offsetX = (min * 0.35f), offsetY = -(boxMaxHeight * 0.2f)),
+            Config(size = min * 0.35f, width = min * 0.35f, height = min * 0.35f, align = Alignment.TopStart, rot = 25f, shape = RoundedStarShape(4, 0.1f, rotation = 45f), offsetX = (min * 0.3f), offsetY = (boxMaxHeight * 0.2f)),
+            Config(size = min * 0.35f, width = min * 0.35f, height = min * 0.35f, align = Alignment.BottomEnd, rot = 25f, shape = RoundedStarShape(4, 0.1f, rotation = 45f), offsetX = -(min * 0.3f), offsetY = -(boxMaxHeight * 0.2f))
         )
 
-        // New symmetrical pattern with adjusted spacing
+        // Symmetrical pattern with guaranteed spacing
         val pattern4 = listOf(
-            Config(size = min * 0.45f, width = min * 0.45f, height = min * 0.45f, align = Alignment.TopStart, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = (min * 0.1f), offsetY = (boxMaxHeight * 0.1f)),
-            Config(size = min * 0.45f, width = min * 0.45f, height = min * 0.45f, align = Alignment.TopEnd, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = -(min * 0.1f), offsetY = (boxMaxHeight * 0.1f)),
-            Config(size = min * 0.45f, width = min * 0.45f, height = min * 0.45f, align = Alignment.BottomStart, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = (min * 0.1f), offsetY = -(boxMaxHeight * 0.1f)),
-            Config(size = min * 0.45f, width = min * 0.45f, height = min * 0.45f, align = Alignment.BottomEnd, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = -(min * 0.1f), offsetY = -(boxMaxHeight * 0.1f)),
-            Config(size = min * 0.35f, width = min * 0.35f, height = min * 0.35f, align = Alignment.Center, rot = 45f, shape = RoundedCornerShape(12.dp), offsetX = 0.dp, offsetY = 0.dp)
+            Config(size = min * 0.4f, width = min * 0.4f, height = min * 0.4f, align = Alignment.TopStart, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = (min * 0.2f), offsetY = (boxMaxHeight * 0.2f)),
+            Config(size = min * 0.4f, width = min * 0.4f, height = min * 0.4f, align = Alignment.TopEnd, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = -(min * 0.2f), offsetY = (boxMaxHeight * 0.2f)),
+            Config(size = min * 0.4f, width = min * 0.4f, height = min * 0.4f, align = Alignment.BottomStart, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = (min * 0.2f), offsetY = -(boxMaxHeight * 0.2f)),
+            Config(size = min * 0.4f, width = min * 0.4f, height = min * 0.4f, align = Alignment.BottomEnd, rot = 0f, shape = RoundedCornerShape(24.dp), offsetX = -(min * 0.2f), offsetY = -(boxMaxHeight * 0.2f)),
+            Config(size = min * 0.3f, width = min * 0.3f, height = min * 0.3f, align = Alignment.Center, rot = 45f, shape = RoundedCornerShape(12.dp), offsetX = 0.dp, offsetY = 0.dp)
         )
 
         listOf(pattern1, pattern2, pattern3, pattern4)
