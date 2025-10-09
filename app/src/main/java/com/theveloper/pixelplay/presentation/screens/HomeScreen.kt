@@ -58,7 +58,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavController
 import com.theveloper.pixelplay.R
 import com.theveloper.pixelplay.data.model.Song
-import com.theveloper.pixelplay.presentation.components.AlbumArtCollage
+import com.theveloper.pixelplay.presentation.components.collage.AlbumArtCollage
 import com.theveloper.pixelplay.presentation.components.DailyMixSection
 import com.theveloper.pixelplay.presentation.components.HomeGradientTopBar
 import com.theveloper.pixelplay.presentation.components.HomeOptionsBottomSheet
