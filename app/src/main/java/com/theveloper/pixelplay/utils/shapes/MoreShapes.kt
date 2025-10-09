@@ -1,8 +1,6 @@
 package com.theveloper.pixelplay.utils.shapes
 
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -21,10 +19,10 @@ class SquircleShape(private val cornerRadius: Float) : Shape {
         density: Density
     ): Outline {
         return Outline.Rounded(
-            RoundRect(
+            androidx.compose.ui.geometry.RoundRect(
                 rect = Rect(0f, 0f, size.width, size.height),
-                cornerRadius = CornerRadius(x = cornerRadius, y = cornerRadius)
-                //cornerRadiusY = cornerRadius
+                cornerRadius = cornerRadius,
+                cornerRadiusY = cornerRadius
             )
         )
     }
