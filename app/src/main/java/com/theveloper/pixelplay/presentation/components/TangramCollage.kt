@@ -82,7 +82,7 @@ fun TangramCollage(
                     .rotate(item.rotation)
                     .clip(item.shape)
             ) {
-                item.content()
+                item.content(this)
             }
         }
     }
