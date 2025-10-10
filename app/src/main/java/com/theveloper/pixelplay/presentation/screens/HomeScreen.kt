@@ -173,6 +173,10 @@ fun HomeScreen(
                     }
                 }
 
+                item(key = "spacer") {
+                    Spacer(modifier = Modifier.height(30.dp))
+                }
+
                 // Daily Mix
                 if (dailyMixSongs.isNotEmpty()) {
                     item(key = "daily_mix_section") {

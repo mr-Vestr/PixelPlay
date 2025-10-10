@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -166,29 +167,29 @@ object CollagePatterns {
         // 3. Circle near the pill's bottom right
         PatternItem(
             shape = CircleShape,
-            relativeOffset = Offset(0.7f, 0.4f),
+            relativeOffset = Offset(0.7f, 0.55f),
             relativeSize = Size(0.25f, 0.2f)
         ) { ColorContent(MaterialTheme.colorScheme.tertiaryContainer) },
         // 4. Squircle bottom-left, rotated
         PatternItem(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-            relativeOffset = Offset(0.1f, 0.65f),
-            relativeSize = Size(0.35f, 0.3f),
+            shape = RoundedCornerShape(20.dp),
+            relativeOffset = Offset(0.1f, 0.75f),
+            relativeSize = Size(0.25f, 0.2f),
             rotation = -20f
         ) { ColorContent(MaterialTheme.colorScheme.secondaryContainer) },
         // 5. Star bottom-right
         PatternItem(
             shape = RoundedStarShape(sides = 6, curve = 0.09, rotation = 45f),
-            relativeOffset = Offset(0.55f, 0.7f),
-            relativeSize = Size(0.4f, 0.3f)
+            relativeOffset = Offset(0.45f, 0.8f),
+            relativeSize = Size(0.5f, 0.4f)
         ) { ColorContent(MaterialTheme.colorScheme.primaryContainer) }
     )
 
     val symmetricalPattern: List<PatternItem> = listOf(
         PatternItem(
-            shape = MaterialExpressiveShapes.Pentagon,
-            relativeOffset = Offset(0.3f, 0.35f),
-            relativeSize = Size(0.4f, 0.35f)
+            shape = MaterialExpressiveShapes.Scallop,
+            relativeOffset = Offset(0.2f, 0.25f),
+            relativeSize = Size(0.6f, 0.55f)
         ) { ColorContent(MaterialTheme.colorScheme.primaryContainer) },
         PatternItem(
             shape = MaterialExpressiveShapes.SoftSquare,
@@ -219,25 +220,25 @@ object CollagePatterns {
     val dynamicFlowPattern: List<PatternItem> = listOf(
         PatternItem(
             shape = MaterialExpressiveShapes.AsymmetricStar,
-            relativeOffset = Offset(0.55f, 0.1f),
-            relativeSize = Size(0.4f, 0.35f),
+            relativeOffset = Offset(0.0f, 0.0f),
+            relativeSize = Size(0.7f, 0.65f),
             rotation = 25f
         ) { ColorContent(MaterialTheme.colorScheme.primaryContainer) },
         PatternItem(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-            relativeOffset = Offset(0.3f, 0.3f),
-            relativeSize = Size(0.4f, 0.3f),
+            shape = RoundedCornerShape(20.dp),
+            relativeOffset = Offset(0.6f, 0.6f),
+            relativeSize = Size(0.3f, 0.25f),
             rotation = 15f
         ) { ColorContent(MaterialTheme.colorScheme.secondaryContainer) },
         PatternItem(
             shape = MaterialExpressiveShapes.Scallop,
-            relativeOffset = Offset(0.1f, 0.5f),
-            relativeSize = Size(0.35f, 0.28f),
+            relativeOffset = Offset(0.0f, 0.7f),
+            relativeSize = Size(0.55f, 0.38f),
             rotation = 5f
         ) { ColorContent(MaterialTheme.colorScheme.tertiaryContainer) },
         PatternItem(
             shape = CircleShape,
-            relativeOffset = Offset(0.5f, 0.65f),
+            relativeOffset = Offset(0.57f, 0.9f),
             relativeSize = Size(0.3f, 0.25f)
         ) { ColorContent(MaterialTheme.colorScheme.primaryContainer) }
     )
@@ -245,32 +246,32 @@ object CollagePatterns {
     val expressiveShapesPattern: List<PatternItem> = listOf(
         PatternItem(
             shape = RoundedStarShape(sides = 7, curve = 0.25),
-            relativeOffset = Offset(0.3f, 0.05f),
-            relativeSize = Size(0.4f, 0.35f),
+            relativeOffset = Offset(0.4f, 0.0f),
+            relativeSize = Size(0.9f, 0.85f),
             rotation = 15f
         ) { ColorContent(MaterialTheme.colorScheme.primaryContainer) },
         PatternItem(
-            shape = PolygonShape(sides = 3, rotation = 0f), // Triangle
-            relativeOffset = Offset(0.05f, 0.3f),
-            relativeSize = Size(0.3f, 0.25f),
+            shape = RoundedStarShape(sides = 3, curve = 0.20), // Triangle
+            relativeOffset = Offset(0.0f, 0.0f),
+            relativeSize = Size(0.45f, 0.4f),
             rotation = -25f
         ) { ColorContent(MaterialTheme.colorScheme.secondaryContainer) },
         PatternItem(
-            shape = RoundedStarShape(sides = 4, curve = 0.8, rotation = 45f), // Shuriken/Star
-            relativeOffset = Offset(0.65f, 0.4f),
-            relativeSize = Size(0.3f, 0.25f),
+            shape = RoundedStarShape(sides = 4, curve = 0.35, rotation = 45f), // Shuriken/Star
+            relativeOffset = Offset(0.0f, 0.9f),
+            relativeSize = Size(0.5f, 0.45f),
             rotation = 20f
         ) { ColorContent(MaterialTheme.colorScheme.tertiaryContainer) },
         PatternItem(
-            shape = PolygonShape(sides = 6), // Hexagon
-            relativeOffset = Offset(0.2f, 0.6f),
-            relativeSize = Size(0.4f, 0.35f),
+            shape = RoundedStarShape(sides = 5, curve = 0.20), // Hexagon
+            relativeOffset = Offset(0.0f, 0.45f),
+            relativeSize = Size(0.55f, 0.5f),
             rotation = 0f
         ) { ColorContent(MaterialTheme.colorScheme.primaryContainer) },
         PatternItem(
             shape = RoundedStarShape(sides = 12, curve = 0.1), // Flower
-            relativeOffset = Offset(0.6f, 0.7f),
-            relativeSize = Size(0.3f, 0.25f),
+            relativeOffset = Offset(0.55f, 0.8f),
+            relativeSize = Size(0.5f, 0.45f),
             rotation = 0f
         ) { ColorContent(MaterialTheme.colorScheme.secondaryContainer) }
     )
