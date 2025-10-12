@@ -48,10 +48,10 @@ fun AlbumCarouselSection(
 
     // Player -> Carousel
     val currentSongIndex = remember(currentSong, queue) {
-        queue.indexOf(currentSong).coerceAtLeast(0)
+        queue.indexOf(currentSong)
     }
     LaunchedEffect(currentSongIndex, queue) {
-        if (carouselState.pagerState.currentPage != currentSongIndex) {
+        if (currentSongIndex != -1 && carouselState.pagerState.currentPage != currentSongIndex) {
             carouselState.animateScrollToItem(currentSongIndex)
         }
     }
