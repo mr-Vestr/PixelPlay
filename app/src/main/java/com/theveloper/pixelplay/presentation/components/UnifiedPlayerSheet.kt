@@ -796,11 +796,26 @@ fun UnifiedPlayerSheet(
                                 )
                             }
                             .padding(horizontal = currentHorizontalPadding)
-                            .height(playerContentAreaActualHeightDp)
+                            .height(containerHeight)
                             .graphicsLayer {
+                                val fraction = playerContentExpansionFraction.value
                                 translationX = offsetAnimatable.value
-                                scaleY = visualOvershootScaleY.value
+
+                                // 1. Performant Scaling
+                                val containerHeightPx = with(density) { containerHeight.toPx() }
+                                val baseScale = lerp(miniPlayerContentHeightPx / containerHeightPx, 1f, fraction)
+
+                                // 2. High-Quality Bounce Effect
+                                scaleY = baseScale * visualOvershootScaleY.value
+
+                                // 3. Correct Translation
+                                val unscaledHeight = playerContentAreaActualHeightPx
+                                val scaledHeight = unscaledHeight * scaleY
+                                translationY = (unscaledHeight - scaledHeight) / 2f
+
+                                // 4. Correct Transform Origin
                                 transformOrigin = TransformOrigin(0.5f, 1f)
+                                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                             }
                             .shadow(
                                 elevation = playerAreaElevation,

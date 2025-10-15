@@ -361,7 +361,7 @@ fun FullPlayerContent(
                     .fillMaxWidth()
                     .padding(vertical = lerp(4.dp, 8.dp, expansionFraction))
                     .graphicsLayer {
-                        alpha = expansionFraction
+                        alpha = ((expansionFraction - 0.75f) / 0.25f).coerceIn(0f, 1f)
                     }
             ) {
                 val carouselHeight = when (carouselStyle) {
@@ -417,7 +417,12 @@ fun FullPlayerContent(
                 timeTextColor = LocalMaterialTheme.current.onPrimaryContainer.copy(alpha = 0.7f)
             )
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.graphicsLayer {
+                    alpha = ((expansionFraction - 0.8f) / 0.2f).coerceIn(0f, 1f)
+                }
+            ) {
                 AnimatedPlaybackControls(
                     modifier = Modifier
                         .padding(horizontal = 12.dp, vertical = 8.dp),
