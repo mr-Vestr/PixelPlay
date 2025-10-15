@@ -275,52 +275,6 @@ fun UnifiedPlayerSheet(
         }
     }
 
-    val playerContentAreaActualHeightPx by remember(showPlayerContentArea, playerContentExpansionFraction, containerHeight, miniPlayerContentHeightPx) {
-        derivedStateOf {
-            if (showPlayerContentArea) {
-                val containerHeightPx = with(density) { containerHeight.toPx() }
-                lerp(miniPlayerContentHeightPx, containerHeightPx, playerContentExpansionFraction.value)
-            } else { 0f }
-        }
-    }
-    val playerContentAreaActualHeightDp = with(density) { playerContentAreaActualHeightPx.toDp() }
-
-    val totalSheetHeightWhenContentCollapsedPx = remember(
-        isPlayerSlotOccupied,
-        hideMiniPlayer,
-        miniPlayerAndSpacerHeightPx
-    ) {
-        if (isPlayerSlotOccupied && !hideMiniPlayer) miniPlayerAndSpacerHeightPx else 0f
-    }
-
-    val animatedTotalSheetHeightPx by remember(
-        isPlayerSlotOccupied,
-        playerContentExpansionFraction,
-        screenHeightPx,
-        totalSheetHeightWhenContentCollapsedPx
-    ) {
-        derivedStateOf {
-            if (isPlayerSlotOccupied) {
-                lerp(totalSheetHeightWhenContentCollapsedPx, screenHeightPx, playerContentExpansionFraction.value)
-            } else {
-                0f
-            }
-        }
-    }
-
-    val navBarElevation = 3.dp
-    val shadowSpacePx = remember(density, navBarElevation) {
-        with(density) { (navBarElevation * 8).toPx() }
-    }
-
-    val animatedTotalSheetHeightWithShadowPx by remember(animatedTotalSheetHeightPx, shadowSpacePx) {
-        derivedStateOf {
-            animatedTotalSheetHeightPx + shadowSpacePx
-        }
-    }
-    val animatedTotalSheetHeightWithShadowDp = with(density) { animatedTotalSheetHeightWithShadowPx.toDp() }
-
-    with(density) { animatedTotalSheetHeightPx.toDp() }
 
     val sheetExpandedTargetY = 0f
 
@@ -693,7 +647,7 @@ fun UnifiedPlayerSheet(
                 .graphicsLayer {
                     translationY = visualSheetTranslationY
                 }
-                .height(animatedTotalSheetHeightWithShadowDp),
+                .height(containerHeight),
             shadowElevation = 0.dp,
             color = Color.Transparent
         ) {
