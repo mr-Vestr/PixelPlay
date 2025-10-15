@@ -808,12 +808,7 @@ fun UnifiedPlayerSheet(
                                 // 2. High-Quality Bounce Effect
                                 scaleY = baseScale * visualOvershootScaleY.value
 
-                                // 3. Correct Translation
-                                val unscaledHeight = playerContentAreaActualHeightPx
-                                val scaledHeight = unscaledHeight * scaleY
-                                translationY = (unscaledHeight - scaledHeight) / 2f
-
-                                // 4. Correct Transform Origin
+                                // 3. Correct Transform Origin
                                 transformOrigin = TransformOrigin(0.5f, 1f)
                                 compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                             }
